@@ -6,8 +6,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Note: Plus Jakarta Sans font files will need to be added to res/font/
-// For now using system default font family
+// Use system default font for static typography
+// Plus Jakarta Sans will be loaded dynamically in Theme.kt
 val DisplayFontFamily = FontFamily.Default
 
 // Custom typography based on Plus Jakarta Sans design system

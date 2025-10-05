@@ -1,29 +1,23 @@
 package com.v7h.whattodonext.presentation.ui.screen.deck
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.v7h.whattodonext.presentation.theme.WhatToDoNextTheme
 import com.v7h.whattodonext.presentation.theme.CardShape
-import com.v7h.whattodonext.presentation.theme.CircularButtonShape
+import com.v7h.whattodonext.presentation.ui.components.SwipeableCard
+import com.v7h.whattodonext.data.model.SavedChoice
+import com.v7h.whattodonext.data.repository.SavedChoiceRepository
 
 /**
  * S-002: Main Deck Screen - Primary interface for card swiping
@@ -41,11 +35,12 @@ import com.v7h.whattodonext.presentation.theme.CircularButtonShape
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckScreen(
-    onNavigateToDetail: (String) -> Unit = {}
+    onNavigateToDetail: (String) -> Unit = {},
+    savedChoiceRepository: SavedChoiceRepository = remember { SavedChoiceRepository() }
 ) {
     // Debug log for screen initialization
     LaunchedEffect(Unit) {
-        android.util.Log.d("DeckScreen", "Main deck screen loaded with placeholder data")
+        android.util.Log.d("DeckScreen", "Main deck screen loaded with swipeable cards")
     }
     
     // Local state for activity selector
@@ -60,6 +55,17 @@ fun DeckScreen(
         "Books",
         "Travel destinations"
     )
+    
+    // Placeholder card data for Step 2
+    val currentCard = remember {
+        mapOf(
+            "id" to "park_activity_001",
+            "title" to "Go to a local park",
+            "description" to "Enjoy the outdoors and fresh air. Pack a picnic or just relax.",
+            "imageUrl" to "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop",
+            "activityType" to "Outdoor activities"
+        )
+    }
     
     Column(
         modifier = Modifier
@@ -141,166 +147,48 @@ fun DeckScreen(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // Main Card (F-003) - Placeholder data matching UI reference
-        ActivityCard(
-            imageUrl = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop",
-            title = "Go to a local park",
-            description = "Enjoy the outdoors and fresh air. Pack a picnic or just relax.",
+        // Swipeable Card (F-003) - Step 2 implementation with gesture detection
+        SwipeableCard(
+            imageUrl = currentCard["imageUrl"] ?: "",
+            title = currentCard["title"] ?: "",
+            description = currentCard["description"] ?: "",
             onCardClick = {
                 android.util.Log.d("DeckScreen", "Card tapped - navigating to detail")
-                onNavigateToDetail("park_activity_001")
+                onNavigateToDetail(currentCard["id"] ?: "")
             },
-            onDecline = {
-                android.util.Log.d("DeckScreen", "Card declined")
-                // TODO: Implement swipe left logic in Step 2
+            onSwipeLeft = {
+                android.util.Log.d("DeckScreen", "Card declined via swipe left")
+                // TODO: Load next card in Step 4
+            },
+            onSwipeRight = {
+                android.util.Log.d("DeckScreen", "Card accepted via swipe right")
+                // Add to saved choices for Step 3
+                val savedChoice = SavedChoice.create(
+                    id = currentCard["id"] ?: "",
+                    title = currentCard["title"] ?: "",
+                    description = currentCard["description"] ?: "",
+                    imageUrl = currentCard["imageUrl"] ?: "",
+                    activityType = currentCard["activityType"] ?: ""
+                )
+                savedChoiceRepository.addSavedChoice(savedChoice)
+                // TODO: Load next card in Step 4
             },
             onSave = {
-                android.util.Log.d("DeckScreen", "Card saved")
-                // TODO: Implement save logic in Step 3
-            },
-            onAccept = {
-                android.util.Log.d("DeckScreen", "Card accepted")
-                // TODO: Implement swipe right logic in Step 2
+                android.util.Log.d("DeckScreen", "Card saved via button")
+                // Add to saved choices for Step 3
+                val savedChoice = SavedChoice.create(
+                    id = currentCard["id"] ?: "",
+                    title = currentCard["title"] ?: "",
+                    description = currentCard["description"] ?: "",
+                    imageUrl = currentCard["imageUrl"] ?: "",
+                    activityType = currentCard["activityType"] ?: ""
+                )
+                savedChoiceRepository.addSavedChoice(savedChoice)
             }
         )
     }
 }
 
-/**
- * Main activity card component matching the UI reference
- * 
- * Features:
- * - Large image at top
- * - Title and description below
- * - Three action buttons (Decline/Save/Accept)
- */
-@Composable
-private fun ActivityCard(
-    imageUrl: String,
-    title: String,
-    description: String,
-    onCardClick: () -> Unit,
-    onDecline: () -> Unit,
-    onSave: () -> Unit,
-    onAccept: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() },
-        shape = CardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column {
-            // Large image matching UI reference
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp)
-                    .clip(CardShape),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Title and description
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            // Action buttons matching UI reference
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // Decline button (red)
-                ActionButton(
-                    icon = Icons.Filled.Close,
-                    label = "Decline",
-                    backgroundColor = MaterialTheme.colorScheme.error,
-                    onClick = onDecline
-                )
-                
-                // Save button (gray)
-                ActionButton(
-                    icon = Icons.Filled.Bookmark,
-                    label = "Save", 
-                    backgroundColor = Color(0xFF9E9E9E), // Keep gray for save button
-                    onClick = onSave
-                )
-                
-                // Accept button (green)
-                ActionButton(
-                    icon = Icons.Filled.Check,
-                    label = "Accept",
-                    backgroundColor = MaterialTheme.colorScheme.primary,
-                    onClick = onAccept
-                )
-            }
-        }
-    }
-}
-
-/**
- * Circular action button component with Material Symbols
- */
-@Composable
-private fun ActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    backgroundColor: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.size(56.dp),
-            shape = CircularButtonShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = backgroundColor
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 @Preview(showBackground = true)
 @Composable
