@@ -9,3 +9,7 @@
 # header note.
 # Replace this path with your actual Android SDK path
 sdk.dir=/Users/YOUR_USERNAME/Library/Android/sdk
+
+# TMDB API Key - Get your free API key from https://www.themoviedb.org/settings/api
+# Keep this secure and never commit to version control
+TMDB_API_KEY=your_tmdb_api_key_here

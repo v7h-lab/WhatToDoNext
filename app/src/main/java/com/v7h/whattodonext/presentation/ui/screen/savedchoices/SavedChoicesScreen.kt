@@ -165,16 +165,6 @@ private fun SavedChoiceItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 Text(
-                    text = savedChoice.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
                     text = savedChoice.activityType,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary

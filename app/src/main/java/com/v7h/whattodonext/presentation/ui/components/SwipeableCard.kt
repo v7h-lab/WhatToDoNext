@@ -51,19 +51,18 @@ import kotlinx.coroutines.launch
  * - Visual feedback and animations during gestures
  * - Button fallbacks for accessibility
  * - Responsive design that adapts to different screen sizes
- * - 3-line text limit with expandable "read more" functionality
+ * - Large image preview for better visual impact
  * - Guaranteed button visibility on all screen sizes
  * - Design system colors and typography
  * - Movie ratings and genre display for movie cards
  * - Crash prevention with robust error handling
  * 
- * Applied Rules: Debug logs, comments, responsive design, text truncation, movie metadata display, gesture interactions, crash prevention
+ * Applied Rules: Debug logs, comments, responsive design, large image preview, movie metadata display, gesture interactions, crash prevention
  */
 @Composable
 fun SwipeableCard(
     imageUrl: String,
     title: String,
-    description: String,
     onCardClick: () -> Unit,
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit,
@@ -138,12 +137,12 @@ fun SwipeableCard(
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val screenHeight = maxHeight
         
-        // Calculate responsive image height based on screen size
+        // Calculate responsive image height based on screen size - increased for bigger preview
         val responsiveImageHeight = remember(screenHeight) {
             when {
-                screenHeight < 600.dp -> 200.dp // Small screens
-                screenHeight < 800.dp -> 280.dp // Medium screens  
-                else -> 350.dp // Large screens
+                screenHeight < 600.dp -> 300.dp // Small screens - increased from 200dp
+                screenHeight < 800.dp -> 400.dp // Medium screens - increased from 280dp
+                else -> 500.dp // Large screens - increased from 350dp
             }
         }
         
@@ -316,7 +315,7 @@ fun SwipeableCard(
                     contentScale = ContentScale.Crop
                 )
                 
-                // Content area with flexible height
+                // Content area with flexible height - simplified without description
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -338,17 +337,7 @@ fun SwipeableCard(
                             rating = movieRating,
                             genre = movieGenre
                         )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
                     }
-                    
-                    // Expandable description with 3-line limit and read more
-                    ExpandableText(
-                        text = description,
-                        maxLines = 3,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
                 
                 // Visual feedback overlay for gestures
@@ -422,76 +411,6 @@ fun SwipeableCard(
     }
 }
 
-/**
- * Expandable text component with 3-line limit and read more functionality
- * 
- * Applied Rules: Debug logs, comments, responsive design
- */
-@Composable
-private fun ExpandableText(
-    text: String,
-    maxLines: Int,
-    style: androidx.compose.ui.text.TextStyle,
-    color: Color
-) {
-    var expanded by remember { mutableStateOf(false) }
-    
-    // Debug log for text processing
-    LaunchedEffect(text) {
-        android.util.Log.d("SwipeableCard", "Processing expandable text: ${text.length} characters")
-    }
-    
-    Column {
-        Text(
-            text = text,
-            style = style,
-            color = color,
-            maxLines = if (expanded) Int.MAX_VALUE else maxLines,
-            overflow = TextOverflow.Ellipsis,
-            lineHeight = style.lineHeight
-        )
-        
-        // Show "Read more" if text is truncated
-        if (!expanded && shouldShowReadMore(text, maxLines, style)) {
-            Text(
-                text = "Read more...",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clickable { 
-                        expanded = true
-                        android.util.Log.d("SwipeableCard", "Text expanded to full content")
-                    }
-                    .padding(top = 4.dp)
-            )
-        }
-        
-        // Show "Show less" if text is expanded
-        if (expanded) {
-            Text(
-                text = "Show less",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clickable { 
-                        expanded = false
-                        android.util.Log.d("SwipeableCard", "Text collapsed to 3 lines")
-                    }
-                    .padding(top = 4.dp)
-            )
-        }
-    }
-}
-
-/**
- * Simple heuristic to determine if text should show "Read more" button
- */
-private fun shouldShowReadMore(text: String, maxLines: Int, @Suppress("UNUSED_PARAMETER") style: androidx.compose.ui.text.TextStyle): Boolean {
-    // Estimate if text would exceed maxLines based on character count
-    // This is a simple heuristic - in a production app, you'd want more sophisticated text measurement
-    val estimatedCharsPerLine = 50 // Rough estimate
-    return text.length > (estimatedCharsPerLine * maxLines)
-}
 
 /**
  * Movie metadata row component for displaying ratings and genre
@@ -687,7 +606,7 @@ private fun ActionButton(
 }
 
 /**
- * Preview component for movie card with metadata
+ * Preview component for movie card with metadata - updated without description
  */
 @Preview(showBackground = true)
 @Composable
@@ -696,7 +615,6 @@ private fun MovieCardPreview() {
         SwipeableCard(
             imageUrl = "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
             title = "The Shawshank Redemption",
-            description = "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
             onCardClick = {},
             onSwipeLeft = {},
             onSwipeRight = {},

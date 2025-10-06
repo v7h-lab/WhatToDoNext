@@ -1,6 +1,7 @@
 package com.v7h.whattodonext.di
 
 import android.content.Context
+import com.v7h.whattodonext.BuildConfig
 import com.v7h.whattodonext.data.api.TmdbApiService
 import com.v7h.whattodonext.data.api.TmdbApiConfig
 import com.v7h.whattodonext.data.repository.MovieRepository
@@ -25,9 +26,13 @@ import java.util.concurrent.TimeUnit
  */
 object NetworkModule {
     
-    // TMDB API Key - Configured with provided API key
-    // Applied Rules: Debug logs, comments, API key configuration
-    private const val TMDB_API_KEY = "b9bc1ac5ec5467541c471be4d6e2b452"
+    // TMDB API Key - Loaded securely from local.properties via BuildConfig
+    // Applied Rules: Debug logs, comments, secure API key configuration
+    private val TMDB_API_KEY: String by lazy { 
+        BuildConfig.TMDB_API_KEY.also {
+            android.util.Log.d("NetworkModule", "API key loaded from BuildConfig: ${if (it.isNotEmpty()) "configured" else "empty"}")
+        }
+    }
     
     private val okHttpClient: OkHttpClient by lazy {
         // Debug log for HTTP client setup
@@ -103,7 +108,7 @@ object NetworkModule {
      * Check if API key is configured
      */
     fun isApiKeyConfigured(): Boolean {
-        val isConfigured = TMDB_API_KEY != "your_tmdb_api_key_here"
+        val isConfigured = TMDB_API_KEY.isNotEmpty()
         android.util.Log.d("NetworkModule", "API key configured: $isConfigured")
         return isConfigured
     }

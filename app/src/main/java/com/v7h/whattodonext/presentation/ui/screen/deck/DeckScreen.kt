@@ -564,7 +564,6 @@ fun DeckScreen(
         SwipeableCard(
             imageUrl = (currentCard["imageUrl"] as? String) ?: "",
             title = (currentCard["title"] as? String) ?: "",
-            description = (currentCard["description"] as? String) ?: "",
             onCardClick = {
                 val movieId = (currentCard["id"] as? String) ?: ""
                 val movieTitle = (currentCard["title"] as? String) ?: ""
@@ -592,7 +591,7 @@ fun DeckScreen(
                 val savedChoice = SavedChoice.create(
                     id = (currentCard["id"] as? String) ?: "",
                     title = (currentCard["title"] as? String) ?: "",
-                    description = (currentCard["description"] as? String) ?: "",
+                    description = "", // Description removed for larger image preview
                     imageUrl = (currentCard["imageUrl"] as? String) ?: "",
                     activityType = (currentCard["activityType"] as? String) ?: ""
                 )
@@ -605,7 +604,7 @@ fun DeckScreen(
                 val savedChoice = SavedChoice.create(
                     id = (currentCard["id"] as? String) ?: "",
                     title = (currentCard["title"] as? String) ?: "",
-                    description = (currentCard["description"] as? String) ?: "",
+                    description = "", // Description removed for larger image preview
                     imageUrl = (currentCard["imageUrl"] as? String) ?: "",
                     activityType = (currentCard["activityType"] as? String) ?: ""
                 )
