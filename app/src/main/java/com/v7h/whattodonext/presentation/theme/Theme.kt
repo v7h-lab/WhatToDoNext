@@ -97,7 +97,7 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun WhatToDoNextTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
+    // Enable dynamic color to use system colors
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -107,8 +107,14 @@ fun WhatToDoNextTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> {
+            android.util.Log.d("WhatToDoNextTheme", "Using system dark theme")
+            darkColorScheme()
+        }
+        else -> {
+            android.util.Log.d("WhatToDoNextTheme", "Using system light theme")
+            lightColorScheme()
+        }
     }
     
     val view = LocalView.current

@@ -22,6 +22,7 @@ import com.v7h.whattodonext.presentation.ui.screen.profile.ProfileScreen
 import com.v7h.whattodonext.presentation.ui.screen.onboarding.OnboardingScreen
 import com.v7h.whattodonext.data.repository.SavedChoiceRepository
 import com.v7h.whattodonext.data.repository.UserProfileRepository
+import com.v7h.whattodonext.data.repository.MovieRepository
 import com.v7h.whattodonext.di.NetworkModule
 import androidx.compose.ui.platform.LocalContext
 
@@ -47,14 +48,30 @@ fun AppNavigation(
     // Shared repository instances with dependency injection
     val savedChoiceRepository = remember { SavedChoiceRepository() }
     val userProfileRepository = remember { NetworkModule.provideUserProfileRepository(context) }
+    val movieRepository = remember { NetworkModule.movieRepository }
     
     // Check if user has completed onboarding
     val userProfile by userProfileRepository.userProfile.collectAsState()
     val hasCompletedOnboarding = userProfile.hasCompletedOnboarding
     
+    // TEMPORARY DEBUG: Force show bottom nav for testing
+    val forceShowBottomNav = true // Set to false after testing
+    
+    // DEBUG: Add reset onboarding button in Profile screen
+    LaunchedEffect(Unit) {
+        // Uncomment the line below to reset onboarding for testing
+        // userProfileRepository.resetOnboarding()
+    }
+    
     // Debug log for navigation setup
     LaunchedEffect(Unit) {
         android.util.Log.d("AppNavigation", "Navigation system initialized - Onboarding completed: $hasCompletedOnboarding")
+        android.util.Log.d("AppNavigation", "User profile: ${userProfile.userId}, activities: ${userProfile.selectedActivities.size}")
+    }
+    
+    // Debug log for onboarding status changes
+    LaunchedEffect(hasCompletedOnboarding) {
+        android.util.Log.d("AppNavigation", "Onboarding status changed: $hasCompletedOnboarding")
     }
     
     // Get current route for bottom navigation
@@ -65,57 +82,61 @@ fun AppNavigation(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            // F-007: Bottom Navigation Bar (only show after onboarding)
-            if (hasCompletedOnboarding) {
+            // F-007: Bottom Navigation Bar (hide during onboarding, show after)
+            android.util.Log.d("AppNavigation", "Bottom bar visibility check - hasCompletedOnboarding: $hasCompletedOnboarding, forceShow: $forceShowBottomNav")
+            if (hasCompletedOnboarding || forceShowBottomNav) {
+                android.util.Log.d("AppNavigation", "Showing bottom navigation bar")
                 NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Deck") },
-                    label = { Text("Deck") },
-                    selected = currentRoute == Screen.DECK,
-                    onClick = {
-                        android.util.Log.d("AppNavigation", "Bottom nav: Deck selected")
-                        navController.navigate(Screen.DECK) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Deck") },
+                        label = { Text("Deck") },
+                        selected = currentRoute == Screen.DECK,
+                        onClick = {
+                            android.util.Log.d("AppNavigation", "Bottom nav: Deck selected")
+                            navController.navigate(Screen.DECK) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
-                    }
-                )
-                
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Favorite, contentDescription = "Choices") },
-                    label = { Text("Choices") },
-                    selected = currentRoute == Screen.SAVED_CHOICES,
-                    onClick = {
-                        android.util.Log.d("AppNavigation", "Bottom nav: Saved Choices selected")
-                        navController.navigate(Screen.SAVED_CHOICES) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
+                    )
+                    
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Favorite, contentDescription = "Choices") },
+                        label = { Text("Choices") },
+                        selected = currentRoute == Screen.SAVED_CHOICES,
+                        onClick = {
+                            android.util.Log.d("AppNavigation", "Bottom nav: Saved Choices selected")
+                            navController.navigate(Screen.SAVED_CHOICES) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
-                    }
-                )
-                
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                    selected = currentRoute == Screen.PROFILE,
-                    onClick = {
-                        android.util.Log.d("AppNavigation", "Bottom nav: Profile selected")
-                        navController.navigate(Screen.PROFILE) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
+                    )
+                    
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+                        label = { Text("Profile") },
+                        selected = currentRoute == Screen.PROFILE,
+                        onClick = {
+                            android.util.Log.d("AppNavigation", "Bottom nav: Profile selected")
+                            navController.navigate(Screen.PROFILE) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
-                    }
-                )
-            }
+                    )
+                }
+            } else {
+                android.util.Log.d("AppNavigation", "Hiding bottom navigation bar - onboarding not completed")
             }
         }
     ) { innerPadding ->
@@ -131,21 +152,11 @@ fun AppNavigation(
                         // Complete onboarding and navigate to main app
                         android.util.Log.d("AppNavigation", "Onboarding completed, navigating to main app")
                         
-                        // Mark onboarding as completed in the repository
-                        // Note: This should be done in a coroutine scope in a real app
-                        // For now, we'll handle it synchronously
-                        try {
-                            // The onboarding completion will be handled by the repository
-                            // when the user profile is updated with selected activities
-                            android.util.Log.d("AppNavigation", "Onboarding completion will be saved when activities are selected")
-                        } catch (e: Exception) {
-                            android.util.Log.e("AppNavigation", "Error completing onboarding", e)
-                        }
-                        
                         navController.navigate(Screen.DECK) {
                             popUpTo(Screen.ONBOARDING) { inclusive = true }
                         }
-                    }
+                    },
+                    userProfileRepository = userProfileRepository
                 )
             }
             // S-002: Main Deck Screen (primary interface)
@@ -174,7 +185,8 @@ fun AppNavigation(
                         // Debug log for navigation
                         android.util.Log.d("AppNavigation", "Navigating back from detail")
                         navController.popBackStack()
-                    }
+                    },
+                    movieRepository = movieRepository
                 )
             }
             

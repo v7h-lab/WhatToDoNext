@@ -53,7 +53,7 @@ class UserProfileStorage(private val context: Context) {
     private fun loadUserProfile(): UserProfile {
         return try {
             val userId = prefs.getString(KEY_USER_ID, "default_user") ?: "default_user"
-            val hasCompletedOnboarding = prefs.getBoolean(KEY_HAS_COMPLETED_ONBOARDING, true) // Temporarily default to true for testing
+            val hasCompletedOnboarding = prefs.getBoolean(KEY_HAS_COMPLETED_ONBOARDING, false) // Default to false for new users
             val createdAt = prefs.getLong(KEY_CREATED_AT, System.currentTimeMillis())
             val updatedAt = prefs.getLong(KEY_UPDATED_AT, System.currentTimeMillis())
             

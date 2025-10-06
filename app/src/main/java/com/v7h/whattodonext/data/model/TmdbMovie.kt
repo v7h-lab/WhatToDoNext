@@ -74,9 +74,45 @@ data class TmdbMovie(
                 "vote_count" to voteCount.toString(),
                 "original_language" to originalLanguage,
                 "popularity" to popularity.toString(),
-                "genre_ids" to genreIds.joinToString(",")
+                "genre_ids" to genreIds.joinToString(","),
+                "genre" to getGenreNameFromIds(genreIds)
             )
         )
+    }
+    
+    /**
+     * Convert genre IDs to genre names
+     * This is a simplified mapping - in production, fetch from TMDB genres API
+     */
+    private fun getGenreNameFromIds(genreIds: List<Int>): String {
+        val genreMapping = mapOf(
+            28 to "Action",
+            12 to "Adventure", 
+            16 to "Animation",
+            35 to "Comedy",
+            80 to "Crime",
+            99 to "Documentary",
+            18 to "Drama",
+            10751 to "Family",
+            14 to "Fantasy",
+            36 to "History",
+            27 to "Horror",
+            10402 to "Music",
+            9648 to "Mystery",
+            10749 to "Romance",
+            878 to "Science Fiction",
+            10770 to "TV Movie",
+            53 to "Thriller",
+            10752 to "War",
+            37 to "Western"
+        )
+        
+        val genreNames = genreIds.mapNotNull { id -> genreMapping[id] }
+        return if (genreNames.isNotEmpty()) {
+            genreNames.take(2).joinToString(", ") // Show max 2 genres
+        } else {
+            "Drama" // Default fallback
+        }
     }
 }
 

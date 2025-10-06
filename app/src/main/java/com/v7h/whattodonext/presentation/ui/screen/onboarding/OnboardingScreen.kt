@@ -37,14 +37,41 @@ import com.v7h.whattodonext.presentation.theme.CardShape
 @Composable
 fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
+    userProfileRepository: com.v7h.whattodonext.data.repository.UserProfileRepository? = null,
     modifier: Modifier = Modifier
 ) {
     var currentStep by remember { mutableStateOf(0) }
     var selectedActivities by remember { mutableStateOf(setOf<ActivityType>()) }
+    var isCompletingOnboarding by remember { mutableStateOf(false) }
     
     // Debug log for onboarding start
     LaunchedEffect(Unit) {
         android.util.Log.d("OnboardingScreen", "Onboarding started - Step $currentStep")
+    }
+    
+    // Handle onboarding completion with repository
+    LaunchedEffect(isCompletingOnboarding) {
+        if (isCompletingOnboarding && userProfileRepository != null) {
+            try {
+                // Update selected activities in the repository
+                userProfileRepository.updateSelectedActivities(selectedActivities.toList())
+                
+                // Mark onboarding as completed
+                userProfileRepository.completeOnboarding()
+                
+                android.util.Log.d("OnboardingScreen", "Successfully saved ${selectedActivities.size} activities and marked onboarding complete")
+                
+                // Navigate to main app
+                onOnboardingComplete()
+            } catch (e: Exception) {
+                android.util.Log.e("OnboardingScreen", "Error saving onboarding data", e)
+                // Still navigate to main app even if save fails
+                onOnboardingComplete()
+            }
+        } else if (isCompletingOnboarding && userProfileRepository == null) {
+            android.util.Log.w("OnboardingScreen", "No userProfileRepository provided, completing onboarding without saving")
+            onOnboardingComplete()
+        }
     }
     
     Column(
@@ -84,7 +111,7 @@ fun OnboardingScreen(
                 selectedActivities = selectedActivities,
                 onComplete = {
                     android.util.Log.d("OnboardingScreen", "Onboarding completed with ${selectedActivities.size} activities")
-                    onOnboardingComplete()
+                    isCompletingOnboarding = true
                 }
             )
         }

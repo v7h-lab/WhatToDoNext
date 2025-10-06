@@ -7,6 +7,7 @@ import com.v7h.whattodonext.data.model.TmdbConfiguration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.random.Random
 
 /**
  * Movie Repository - TMDB API Integration
@@ -300,6 +301,87 @@ class MovieRepository(
         android.util.Log.d("MovieRepository", "Mapped genres: $genreNames -> $genreIds")
         
         return genreIds
+    }
+    
+    /**
+     * Shuffle movies for fresh suggestions each time
+     */
+    fun shuffleMovies(movies: List<ActivityContent>): List<ActivityContent> {
+        android.util.Log.d("MovieRepository", "Shuffling ${movies.size} movies for fresh suggestions")
+        return movies.shuffled()
+    }
+    
+    /**
+     * Filter out dismissed movies from the list
+     */
+    fun filterDismissedMovies(movies: List<ActivityContent>, dismissedMovieIds: Set<String>): List<ActivityContent> {
+        val filtered = movies.filter { it.id !in dismissedMovieIds }
+        android.util.Log.d("MovieRepository", "Filtered ${movies.size} movies to ${filtered.size} (removed ${movies.size - filtered.size} dismissed)")
+        return filtered
+    }
+    
+    /**
+     * Get fresh shuffled movies excluding dismissed ones
+     */
+    fun getFreshShuffledMovies(dismissedMovieIds: Set<String> = emptySet()): List<ActivityContent> {
+        // Combine all cached movies from different categories
+        val allMovies = _popularMovies.value + _topRatedMovies.value + _nowPlayingMovies.value
+        
+        // Remove duplicates based on movie ID
+        val uniqueMovies = allMovies.distinctBy { it.id }
+        
+        // Filter out dismissed movies
+        val filteredMovies = filterDismissedMovies(uniqueMovies, dismissedMovieIds)
+        
+        // Shuffle for fresh order
+        val shuffledMovies = shuffleMovies(filteredMovies)
+        
+        android.util.Log.d("MovieRepository", "Generated fresh shuffled list: ${shuffledMovies.size} unique movies")
+        
+        return shuffledMovies
+    }
+    
+    /**
+     * Fetch fresh movies with shuffling and dismissed filtering
+     * This is the main method for getting dynamic movie suggestions
+     */
+    suspend fun fetchFreshMovies(dismissedMovieIds: Set<String> = emptySet()): Result<List<ActivityContent>> {
+        return try {
+            android.util.Log.d("MovieRepository", "Fetching fresh movies with ${dismissedMovieIds.size} dismissed movies filtered out")
+            
+            // Try to fetch from different categories to get variety
+            val popularResult = fetchPopularMovies()
+            val topRatedResult = fetchTopRatedMovies()
+            val nowPlayingResult = fetchNowPlayingMovies()
+            
+            // Combine results from all categories
+            val allMovies = mutableListOf<ActivityContent>()
+            
+            popularResult.getOrNull()?.let { allMovies.addAll(it) }
+            topRatedResult.getOrNull()?.let { allMovies.addAll(it) }
+            nowPlayingResult.getOrNull()?.let { allMovies.addAll(it) }
+            
+            if (allMovies.isNotEmpty()) {
+                // Remove duplicates
+                val uniqueMovies = allMovies.distinctBy { it.id }
+                
+                // Filter out dismissed movies
+                val filteredMovies = filterDismissedMovies(uniqueMovies, dismissedMovieIds)
+                
+                // Shuffle for fresh order
+                val shuffledMovies = shuffleMovies(filteredMovies)
+                
+                android.util.Log.d("MovieRepository", "Successfully fetched ${shuffledMovies.size} fresh movies")
+                
+                Result.success(shuffledMovies)
+            } else {
+                android.util.Log.w("MovieRepository", "No movies fetched from any category, using fallback")
+                Result.success(getFallbackMovies())
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Exception fetching fresh movies", e)
+            Result.failure(e)
+        }
     }
     
     /**

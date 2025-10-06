@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
@@ -26,6 +27,7 @@ import com.v7h.whattodonext.presentation.theme.CircularButtonShape
 import com.v7h.whattodonext.presentation.theme.AcceptButton
 import com.v7h.whattodonext.presentation.theme.DeclineButton
 import com.v7h.whattodonext.presentation.theme.SaveButton
+import com.v7h.whattodonext.presentation.theme.WhatToDoNextTheme
 
 /**
  * Swipeable card component with responsive layout and button interactions
@@ -36,8 +38,9 @@ import com.v7h.whattodonext.presentation.theme.SaveButton
  * - Guaranteed button visibility on all screen sizes
  * - Design system colors and typography
  * - Card tap to view details
+ * - Movie ratings and genre display for movie cards
  * 
- * Applied Rules: Debug logs, comments, responsive design, text truncation
+ * Applied Rules: Debug logs, comments, responsive design, text truncation, movie metadata display
  */
 @Composable
 fun SwipeableCard(
@@ -48,7 +51,11 @@ fun SwipeableCard(
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit,
     onSave: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Movie-specific metadata for enhanced display
+    movieRating: String? = null,
+    movieGenre: String? = null,
+    activityType: String? = null
 ) {
     // Debug log for card initialization
     LaunchedEffect(Unit) {
@@ -110,6 +117,16 @@ fun SwipeableCard(
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Movie ratings and genre - prominent display for movies
+                    if (activityType == "Movies" && (movieRating != null || movieGenre != null)) {
+                        MovieMetadataRow(
+                            rating = movieRating,
+                            genre = movieGenre
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                     
                     // Expandable description with 3-line limit and read more
                     ExpandableText(
@@ -238,6 +255,67 @@ private fun shouldShowReadMore(text: String, maxLines: Int, style: androidx.comp
 }
 
 /**
+ * Movie metadata row component for displaying ratings and genre
+ * 
+ * Applied Rules: Debug logs, comments, prominent display for movie info
+ */
+@Composable
+private fun MovieMetadataRow(
+    rating: String?,
+    genre: String?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Movie rating with star icon
+        rating?.let { ratingValue ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "⭐",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = ratingValue,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "/10",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        // Movie genre with chip-like styling
+        genre?.let { genreValue ->
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Text(
+                    text = genreValue,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
  * Circular action button component with design system colors and typography
  */
 @Composable
@@ -273,6 +351,28 @@ private fun ActionButton(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * Preview component for movie card with metadata
+ */
+@Preview(showBackground = true)
+@Composable
+private fun MovieCardPreview() {
+    WhatToDoNextTheme {
+        SwipeableCard(
+            imageUrl = "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+            title = "The Shawshank Redemption",
+            description = "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
+            onCardClick = {},
+            onSwipeLeft = {},
+            onSwipeRight = {},
+            onSave = {},
+            movieRating = "8.7",
+            movieGenre = "Drama, Crime",
+            activityType = "Movies"
         )
     }
 }
