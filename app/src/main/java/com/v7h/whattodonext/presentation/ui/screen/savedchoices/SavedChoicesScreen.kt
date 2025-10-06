@@ -24,6 +24,8 @@ import com.v7h.whattodonext.presentation.theme.CardShape
 import com.v7h.whattodonext.data.model.SavedChoice
 import com.v7h.whattodonext.data.repository.SavedChoiceRepository
 import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * S-004: Saved Choices Screen - Displays all saved items
@@ -37,15 +39,22 @@ import androidx.compose.runtime.collectAsState
  */
 @Composable
 fun SavedChoicesScreen(
-    savedChoiceRepository: SavedChoiceRepository = remember { SavedChoiceRepository() }
+    savedChoiceRepository: SavedChoiceRepository
 ) {
     // Debug log for screen initialization
     LaunchedEffect(Unit) {
         android.util.Log.d("SavedChoicesScreen", "Saved choices screen loaded")
     }
     
-    // Collect saved choices from repository
-    val savedChoices by remember { savedChoiceRepository.savedChoices }.collectAsState()
+    // Collect saved choices from repository with error handling
+    val savedChoices by remember { 
+        try {
+            savedChoiceRepository.savedChoices
+        } catch (e: Exception) {
+            android.util.Log.e("SavedChoicesScreen", "Error accessing saved choices repository", e)
+            kotlinx.coroutines.flow.MutableStateFlow<List<SavedChoice>>(emptyList()).asStateFlow()
+        }
+    }.collectAsState()
     
     Column(
         modifier = Modifier
@@ -87,7 +96,11 @@ fun SavedChoicesScreen(
                         savedChoice = savedChoice,
                         onRemove = {
                             android.util.Log.d("SavedChoicesScreen", "Removing saved choice: ${savedChoice.title}")
-                            savedChoiceRepository.removeSavedChoice(savedChoice.id)
+                            try {
+                                savedChoiceRepository.removeSavedChoice(savedChoice.id)
+                            } catch (e: Exception) {
+                                android.util.Log.e("SavedChoicesScreen", "Error removing saved choice", e)
+                            }
                         }
                     )
                 }
@@ -213,6 +226,8 @@ private fun EmptySavedChoicesState() {
 @Composable
 private fun SavedChoicesScreenPreview() {
     WhatToDoNextTheme {
-        SavedChoicesScreen()
+        SavedChoicesScreen(
+            savedChoiceRepository = SavedChoiceRepository()
+        )
     }
 }
