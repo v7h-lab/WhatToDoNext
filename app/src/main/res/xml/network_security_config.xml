@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Network Security Configuration for What To Do Next app
+This enforces HTTPS-only connections and improves app security
+Applied Rules: Security, comments
+-->
+<network-security-config>
+    <!-- Default configuration for all connections -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Allow HTTPS connections to any domain -->
+        <domain includeSubdomains="true">*</domain>
+    </domain-config>
+    
+    <!-- Specific configuration for API endpoints -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.themoviedb.org</domain>
+        <domain includeSubdomains="true">image.tmdb.org</domain>
+    </domain-config>
+    
+    <!-- Debug configuration (only for debug builds) -->
+    <debug-overrides>
+        <!-- Allow cleartext traffic for localhost in debug builds -->
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
