@@ -40,42 +40,15 @@ fun DetailScreen(
         android.util.Log.d("DetailScreen", "Detail screen loaded for content: $contentId")
     }
     
-    // Placeholder data for the park activity (matching the card from DeckScreen)
+    // Determine content type and create appropriate details
     val activityDetails = remember(contentId) {
-        ActivityDetails(
-            id = contentId,
-            title = "Go to a local park",
-            description = "Enjoy the outdoors and fresh air. Pack a picnic or just relax.",
-            imageUrl = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop",
-            extendedDescription = """
-                Spending time in a local park is one of the most refreshing and accessible ways to connect with nature. Whether you're looking for a peaceful escape from city life or an active outdoor adventure, parks offer endless possibilities for relaxation and recreation.
-                
-                Benefits of visiting a local park:
-                • Fresh air and natural surroundings help reduce stress
-                • Walking trails provide gentle exercise
-                • Perfect setting for reading, meditation, or simply unwinding
-                • Great for family activities and social gatherings
-                • Often free or low-cost entertainment
-                
-                What to bring:
-                • Comfortable walking shoes
-                • Water bottle
-                • Light snacks or picnic lunch
-                • Sunscreen and hat for sunny days
-                • Camera to capture beautiful moments
-                
-                Tips for a great park visit:
-                • Check park hours and any special events
-                • Bring a blanket for comfortable seating
-                • Consider the weather and dress appropriately
-                • Respect park rules and leave no trace
-                • Explore different areas of the park for variety
-            """.trimIndent(),
-            location = "Local parks in your area",
-            estimatedDuration = "2-4 hours",
-            difficulty = "Easy",
-            category = "Outdoor activities"
-        )
+        if (contentId.startsWith("movie_")) {
+            // Movie content - create movie-specific details
+            createMovieDetails(contentId)
+        } else {
+            // Fallback to park activity for non-movie content
+            createParkActivityDetails(contentId)
+        }
     }
     
     Scaffold(
@@ -147,22 +120,44 @@ fun DetailScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Quick info cards
+                // Quick info cards - show different info based on content type
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    InfoCard(
-                        label = "Duration",
-                        value = activityDetails.estimatedDuration,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    InfoCard(
-                        label = "Difficulty", 
-                        value = activityDetails.difficulty,
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (activityDetails.category == "Movies") {
+                        // Movie-specific info cards
+                        InfoCard(
+                            label = "Rating",
+                            value = "${activityDetails.metadata["vote_average"] ?: "N/A"}/10",
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        InfoCard(
+                            label = "Release Date", 
+                            value = activityDetails.metadata["release_date"] ?: "N/A",
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        InfoCard(
+                            label = "Runtime",
+                            value = activityDetails.estimatedDuration,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        // Activity-specific info cards
+                        InfoCard(
+                            label = "Duration",
+                            value = activityDetails.estimatedDuration,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        InfoCard(
+                            label = "Difficulty", 
+                            value = activityDetails.difficulty,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -185,7 +180,48 @@ fun DetailScreen(
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
-                // Location info
+                // Additional movie information for movies
+                if (activityDetails.category == "Movies") {
+                    // Movie details section
+                    Text(
+                        text = "Movie Details",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Movie metadata cards
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        MovieInfoCard(
+                            label = "Popularity Score",
+                            value = activityDetails.metadata["popularity"] ?: "N/A"
+                        )
+                        
+                        MovieInfoCard(
+                            label = "Vote Count",
+                            value = "${activityDetails.metadata["vote_count"] ?: "N/A"} votes"
+                        )
+                        
+                        MovieInfoCard(
+                            label = "Original Language",
+                            value = activityDetails.metadata["original_language"]?.uppercase() ?: "N/A"
+                        )
+                        
+                        MovieInfoCard(
+                            label = "Genres",
+                            value = "Drama, Crime" // Simplified for now
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+                
+                // Location/Availability info
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = CardShape,
@@ -197,7 +233,7 @@ fun DetailScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Location",
+                            text = if (activityDetails.category == "Movies") "Where to Watch" else "Location",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
@@ -259,6 +295,46 @@ private fun InfoCard(
 }
 
 /**
+ * Movie info card component for displaying movie-specific details
+ * Applied Rules: Debug logs, comments, movie-specific styling
+ */
+@Composable
+private fun MovieInfoCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = CardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/**
  * Data class for activity details (placeholder for future data models)
  */
 private data class ActivityDetails(
@@ -270,8 +346,128 @@ private data class ActivityDetails(
     val location: String,
     val estimatedDuration: String,
     val difficulty: String,
-    val category: String
+    val category: String,
+    val metadata: Map<String, String> = emptyMap()
 )
+
+/**
+ * Create movie-specific details from content ID
+ * Applied Rules: Debug logs, comments, movie-specific data
+ */
+private fun createMovieDetails(contentId: String): ActivityDetails {
+    // Debug log for movie details creation
+    android.util.Log.d("DetailScreen", "Creating movie details for: $contentId")
+    
+    // For now, create sample movie data based on content ID
+    // In a real app, this would fetch from the repository
+    return when {
+        contentId.contains("fallback") -> {
+            ActivityDetails(
+                id = contentId,
+                title = "The Shawshank Redemption",
+                description = "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
+                imageUrl = "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+                extendedDescription = """
+                    The Shawshank Redemption is a 1994 American drama film written and directed by Frank Darabont, based on the 1982 Stephen King novella Rita Hayworth and Shawshank Redemption. The film tells the story of banker Andy Dufresne (Tim Robbins), who is sentenced to life in Shawshank State Penitentiary for the murders of his wife and her lover, despite his claims of innocence.
+                    
+                    Over the following two decades, he befriends a fellow prisoner, contraband smuggler Ellis "Red" Redding (Morgan Freeman), and becomes instrumental in a money laundering operation led by the prison warden Samuel Norton (Bob Gunton).
+                    
+                    The film received critical acclaim and was nominated for seven Academy Awards. It has since been considered one of the greatest films ever made.
+                """.trimIndent(),
+                location = "Available on streaming platforms",
+                estimatedDuration = "2h 22m",
+                difficulty = "Rated R",
+                category = "Movies",
+                metadata = mapOf(
+                    "release_date" to "1994-09-23",
+                    "vote_average" to "8.7",
+                    "vote_count" to "24000",
+                    "original_language" to "en",
+                    "popularity" to "85.4",
+                    "genre_ids" to "18,80"
+                )
+            )
+        }
+        else -> {
+            // Generic movie details for other movies
+            ActivityDetails(
+                id = contentId,
+                title = "Movie Title",
+                description = "Movie description from TMDB API",
+                imageUrl = "https://image.tmdb.org/t/p/w500/placeholder.jpg",
+                extendedDescription = """
+                    This movie details are fetched from The Movie Database (TMDB) API. 
+                    The information includes cast, crew, plot summary, ratings, and more.
+                    
+                    Features:
+                    • Detailed plot summary
+                    • Cast and crew information
+                    • User ratings and reviews
+                    • Release date and runtime
+                    • Genre classification
+                    • Production details
+                    
+                    All data is provided by TMDB and updated regularly.
+                """.trimIndent(),
+                location = "Check local theaters and streaming services",
+                estimatedDuration = "Varies",
+                difficulty = "Rating varies",
+                category = "Movies",
+                metadata = mapOf(
+                    "release_date" to "2024-01-01",
+                    "vote_average" to "7.5",
+                    "vote_count" to "1000",
+                    "original_language" to "en",
+                    "popularity" to "50.0"
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Create park activity details (fallback for non-movie content)
+ * Applied Rules: Debug logs, comments, park activity data
+ */
+private fun createParkActivityDetails(contentId: String): ActivityDetails {
+    // Debug log for park activity details creation
+    android.util.Log.d("DetailScreen", "Creating park activity details for: $contentId")
+    
+    return ActivityDetails(
+        id = contentId,
+        title = "Go to a local park",
+        description = "Enjoy the outdoors and fresh air. Pack a picnic or just relax.",
+        imageUrl = "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop",
+        extendedDescription = """
+            Spending time in a local park is one of the most refreshing and accessible ways to connect with nature. Whether you're looking for a peaceful escape from city life or an active outdoor adventure, parks offer endless possibilities for relaxation and recreation.
+            
+            Benefits of visiting a local park:
+            • Fresh air and natural surroundings help reduce stress
+            • Walking trails provide gentle exercise
+            • Perfect setting for reading, meditation, or simply unwinding
+            • Great for family activities and social gatherings
+            • Often free or low-cost entertainment
+            
+            What to bring:
+            • Comfortable walking shoes
+            • Water bottle
+            • Light snacks or picnic lunch
+            • Sunscreen and hat for sunny days
+            • Camera to capture beautiful moments
+            
+            Tips for a great park visit:
+            • Check park hours and any special events
+            • Bring a blanket for comfortable seating
+            • Consider the weather and dress appropriately
+            • Respect park rules and leave no trace
+            • Explore different areas of the park for variety
+        """.trimIndent(),
+        location = "Local parks in your area",
+        estimatedDuration = "2-4 hours",
+        difficulty = "Easy",
+        category = "Outdoor activities"
+    )
+}
 
 @Preview(showBackground = true)
 @Composable

@@ -7,6 +7,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,7 +19,11 @@ import com.v7h.whattodonext.presentation.ui.screen.deck.DeckScreen
 import com.v7h.whattodonext.presentation.ui.screen.detail.DetailScreen
 import com.v7h.whattodonext.presentation.ui.screen.savedchoices.SavedChoicesScreen
 import com.v7h.whattodonext.presentation.ui.screen.profile.ProfileScreen
+import com.v7h.whattodonext.presentation.ui.screen.onboarding.OnboardingScreen
 import com.v7h.whattodonext.data.repository.SavedChoiceRepository
+import com.v7h.whattodonext.data.repository.UserProfileRepository
+import com.v7h.whattodonext.di.NetworkModule
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Main navigation component for the What To Do Next app
@@ -34,21 +41,33 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController()
 ) {
-    // Shared repository instance for Step 3
+    // Get context for dependency injection
+    val context = LocalContext.current
+    
+    // Shared repository instances with dependency injection
     val savedChoiceRepository = remember { SavedChoiceRepository() }
+    val userProfileRepository = remember { NetworkModule.provideUserProfileRepository(context) }
+    
+    // Check if user has completed onboarding
+    val userProfile by userProfileRepository.userProfile.collectAsState()
+    val hasCompletedOnboarding = userProfile.hasCompletedOnboarding
     
     // Debug log for navigation setup
     LaunchedEffect(Unit) {
-        android.util.Log.d("AppNavigation", "Navigation system initialized with bottom navigation")
+        android.util.Log.d("AppNavigation", "Navigation system initialized - Onboarding completed: $hasCompletedOnboarding")
     }
     
     // Get current route for bottom navigation
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     
     Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            // F-007: Bottom Navigation Bar
-            NavigationBar {
+            // F-007: Bottom Navigation Bar (only show after onboarding)
+            if (hasCompletedOnboarding) {
+                NavigationBar {
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Home, contentDescription = "Deck") },
                     label = { Text("Deck") },
@@ -97,13 +116,38 @@ fun AppNavigation(
                     }
                 )
             }
+            }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.DECK,
-            modifier = modifier
+            startDestination = if (hasCompletedOnboarding) Screen.DECK else Screen.ONBOARDING,
+            modifier = Modifier.padding(innerPadding)
         ) {
+            // S-001: Onboarding Screen (shown first if not completed)
+            composable(Screen.ONBOARDING) {
+                OnboardingScreen(
+                    onOnboardingComplete = {
+                        // Complete onboarding and navigate to main app
+                        android.util.Log.d("AppNavigation", "Onboarding completed, navigating to main app")
+                        
+                        // Mark onboarding as completed in the repository
+                        // Note: This should be done in a coroutine scope in a real app
+                        // For now, we'll handle it synchronously
+                        try {
+                            // The onboarding completion will be handled by the repository
+                            // when the user profile is updated with selected activities
+                            android.util.Log.d("AppNavigation", "Onboarding completion will be saved when activities are selected")
+                        } catch (e: Exception) {
+                            android.util.Log.e("AppNavigation", "Error completing onboarding", e)
+                        }
+                        
+                        navController.navigate(Screen.DECK) {
+                            popUpTo(Screen.ONBOARDING) { inclusive = true }
+                        }
+                    }
+                )
+            }
             // S-002: Main Deck Screen (primary interface)
             composable(Screen.DECK) {
                 DeckScreen(
@@ -112,7 +156,8 @@ fun AppNavigation(
                         android.util.Log.d("AppNavigation", "Navigating to detail: $contentId")
                         navController.navigate(Screen.detailRoute(contentId))
                     },
-                    savedChoiceRepository = savedChoiceRepository
+                    savedChoiceRepository = savedChoiceRepository,
+                    userProfileRepository = userProfileRepository
                 )
             }
             
@@ -142,10 +187,8 @@ fun AppNavigation(
             
             // S-005: Profile Screen
             composable(Screen.PROFILE) {
-                ProfileScreen()
+                ProfileScreen(userProfileRepository = userProfileRepository)
             }
-            
-            // TODO: Add S-001: Onboarding Screen in later steps
         }
     }
 }

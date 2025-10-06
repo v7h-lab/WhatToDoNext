@@ -32,17 +32,10 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             WhatToDoNextTheme {
-                // Main app scaffold with navigation
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background
-                ) { innerPadding ->
-                    AppNavigation(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    )
-                }
+                // Main app navigation without nested Scaffold
+                AppNavigation(
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
         

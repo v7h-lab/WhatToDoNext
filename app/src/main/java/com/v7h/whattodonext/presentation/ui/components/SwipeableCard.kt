@@ -16,7 +16,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import coil.compose.AsyncImage
 import com.v7h.whattodonext.presentation.theme.CardShape
 import com.v7h.whattodonext.presentation.theme.CircularButtonShape
@@ -25,15 +28,16 @@ import com.v7h.whattodonext.presentation.theme.DeclineButton
 import com.v7h.whattodonext.presentation.theme.SaveButton
 
 /**
- * Swipeable card component with button-based interactions for Step 2
+ * Swipeable card component with responsive layout and button interactions
  * 
  * Features:
- * - Button-based swipe actions (Decline/Save/Accept)
+ * - Responsive design that adapts to different screen sizes
+ * - 3-line text limit with expandable "read more" functionality
+ * - Guaranteed button visibility on all screen sizes
  * - Design system colors and typography
  * - Card tap to view details
- * - Visual feedback with proper styling
  * 
- * Applied Rules: Debug logs, comments, design system colors, typography
+ * Applied Rules: Debug logs, comments, responsive design, text truncation
  */
 @Composable
 fun SwipeableCard(
@@ -48,93 +52,189 @@ fun SwipeableCard(
 ) {
     // Debug log for card initialization
     LaunchedEffect(Unit) {
-        android.util.Log.d("SwipeableCard", "Swipeable card initialized with button interactions")
+        android.util.Log.d("SwipeableCard", "Swipeable card initialized with responsive layout")
     }
     
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() },
-        shape = CardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column {
-            // Large image
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp)
-                    .clip(CardShape),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Title and description with design system typography
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    // Use BoxWithConstraints for responsive design
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val screenHeight = maxHeight
+        
+        // Calculate responsive image height based on screen size
+        val responsiveImageHeight = remember(screenHeight) {
+            when {
+                screenHeight < 600.dp -> 200.dp // Small screens
+                screenHeight < 800.dp -> 280.dp // Medium screens  
+                else -> 350.dp // Large screens
             }
-            
-            // Action buttons with design system colors
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+        }
+        
+        // Calculate minimum space needed for buttons (always reserve space)
+        val minButtonSpace = 100.dp // Space for buttons + padding
+        
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCardClick() },
+            shape = CardShape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.heightIn(min = screenHeight - minButtonSpace)
             ) {
-                // Decline button (red) - using design system color
-                ActionButton(
-                    icon = Icons.Default.Close,
-                    label = "Decline",
-                    backgroundColor = DeclineButton,
-                    onClick = {
-                        android.util.Log.d("SwipeableCard", "Decline button tapped")
-                        onSwipeLeft()
-                    }
+                // Responsive image height based on screen size
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(responsiveImageHeight)
+                        .clip(CardShape),
+                    contentScale = ContentScale.Crop
                 )
                 
-                // Save button (gray) - using design system color
-                ActionButton(
-                    icon = Icons.Default.Bookmark,
-                    label = "Save", 
-                    backgroundColor = SaveButton,
-                    onClick = {
-                        android.util.Log.d("SwipeableCard", "Save button tapped")
-                        onSave()
-                    }
-                )
+                // Content area with flexible height
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Expandable description with 3-line limit and read more
+                    ExpandableText(
+                        text = description,
+                        maxLines = 3,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 
-                // Accept button (green) - using design system color
-                ActionButton(
-                    icon = Icons.Default.Check,
-                    label = "Accept",
-                    backgroundColor = AcceptButton,
-                    onClick = {
-                        android.util.Log.d("SwipeableCard", "Accept button tapped")
-                        onSwipeRight()
-                    }
-                )
+                // Action buttons - always at bottom with guaranteed visibility
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                        .padding(bottom = 16.dp), // Optimized bottom padding since Scaffold handles bottom nav
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Decline button (red) - using design system color
+                    ActionButton(
+                        icon = Icons.Default.Close,
+                        label = "Decline",
+                        backgroundColor = DeclineButton,
+                        onClick = {
+                            android.util.Log.d("SwipeableCard", "Decline button tapped")
+                            onSwipeLeft()
+                        }
+                    )
+                    
+                    // Save button (gray) - using design system color
+                    ActionButton(
+                        icon = Icons.Default.Bookmark,
+                        label = "Save", 
+                        backgroundColor = SaveButton,
+                        onClick = {
+                            android.util.Log.d("SwipeableCard", "Save button tapped")
+                            onSave()
+                        }
+                    )
+                    
+                    // Accept button (green) - using design system color
+                    ActionButton(
+                        icon = Icons.Default.Check,
+                        label = "Accept",
+                        backgroundColor = AcceptButton,
+                        onClick = {
+                            android.util.Log.d("SwipeableCard", "Accept button tapped")
+                            onSwipeRight()
+                        }
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * Expandable text component with 3-line limit and read more functionality
+ * 
+ * Applied Rules: Debug logs, comments, responsive design
+ */
+@Composable
+private fun ExpandableText(
+    text: String,
+    maxLines: Int,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    // Debug log for text processing
+    LaunchedEffect(text) {
+        android.util.Log.d("SwipeableCard", "Processing expandable text: ${text.length} characters")
+    }
+    
+    Column {
+        Text(
+            text = text,
+            style = style,
+            color = color,
+            maxLines = if (expanded) Int.MAX_VALUE else maxLines,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = style.lineHeight
+        )
+        
+        // Show "Read more" if text is truncated
+        if (!expanded && shouldShowReadMore(text, maxLines, style)) {
+            Text(
+                text = "Read more...",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { 
+                        expanded = true
+                        android.util.Log.d("SwipeableCard", "Text expanded to full content")
+                    }
+                    .padding(top = 4.dp)
+            )
+        }
+        
+        // Show "Show less" if text is expanded
+        if (expanded) {
+            Text(
+                text = "Show less",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { 
+                        expanded = false
+                        android.util.Log.d("SwipeableCard", "Text collapsed to 3 lines")
+                    }
+                    .padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Simple heuristic to determine if text should show "Read more" button
+ */
+private fun shouldShowReadMore(text: String, maxLines: Int, style: androidx.compose.ui.text.TextStyle): Boolean {
+    // Estimate if text would exceed maxLines based on character count
+    // This is a simple heuristic - in a production app, you'd want more sophisticated text measurement
+    val estimatedCharsPerLine = 50 // Rough estimate
+    return text.length > (estimatedCharsPerLine * maxLines)
 }
 
 /**
