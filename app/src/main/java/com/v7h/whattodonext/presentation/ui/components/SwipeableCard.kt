@@ -68,6 +68,7 @@ fun SwipeableCard(
     onSwipeRight: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    description: String = "", // Description for card details
     // Movie-specific metadata for enhanced display
     movieRating: String? = null,
     movieGenre: String? = null,
@@ -315,7 +316,7 @@ fun SwipeableCard(
                     contentScale = ContentScale.Crop
                 )
                 
-                // Content area with flexible height - simplified without description
+                // Content area with flexible height - includes description for more details
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -336,6 +337,18 @@ fun SwipeableCard(
                         MovieMetadataRow(
                             rating = movieRating,
                             genre = movieGenre
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    
+                    // Description text - maximizes use of header space
+                    if (description.isNotEmpty()) {
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -606,7 +619,7 @@ private fun ActionButton(
 }
 
 /**
- * Preview component for movie card with metadata - updated without description
+ * Preview component for movie card with metadata and description
  */
 @Preview(showBackground = true)
 @Composable
@@ -615,6 +628,7 @@ private fun MovieCardPreview() {
         SwipeableCard(
             imageUrl = "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
             title = "The Shawshank Redemption",
+            description = "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
             onCardClick = {},
             onSwipeLeft = {},
             onSwipeRight = {},

@@ -66,7 +66,7 @@ interface TmdbApiService {
     
     /**
      * Discover movies with filters
-     * Allows filtering by genre, year, rating, etc.
+     * Allows filtering by genre, language, year, rating, etc.
      */
     @GET("discover/movie")
     suspend fun discoverMovies(
@@ -77,6 +77,7 @@ interface TmdbApiService {
         @Query("include_adult") includeAdult: Boolean = false,
         @Query("include_video") includeVideo: Boolean = false,
         @Query("with_genres") withGenres: String? = null,
+        @Query("with_original_language") withOriginalLanguage: String? = null,
         @Query("year") year: Int? = null,
         @Query("vote_average.gte") minVoteAverage: Double? = null,
         @Query("vote_average.lte") maxVoteAverage: Double? = null

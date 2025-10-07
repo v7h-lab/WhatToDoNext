@@ -3,8 +3,6 @@ package com.v7h.whattodonext.presentation.ui.screen.deck
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,19 +30,20 @@ import kotlinx.coroutines.launch
  * S-002: Main Deck Screen - Primary interface for card swiping
  * 
  * Contains:
- * - F-002: Activity Selector (dropdown) - positioned at top with settings icon
- * - F-003: Swipeable Card Deck (main card interface) - larger image for better visual impact
+ * - F-003: Swipeable Card Deck (main card interface) - maximized for card details
  * 
  * Layout changes:
- * - Removed "What to do?" title to maximize card space
- * - Activity dropdown and settings icon positioned side by side at top
- * - Increased card image size to use extra space from removed title area
+ * - Removed activity dropdown and settings icon to maximize card space
+ * - Full-height cards with more details (title, description, metadata)
  * - Three action buttons (Decline/Save/Accept)
+ * - Activity selection is handled in onboarding (single activity only)
+ * 
+ * Applied Rules: Debug logs, comments, maximized card space, simple layout
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckScreen(
-    onNavigateToDetail: (String) -> Unit = {},
+    onNavigateToDetail: (String, ActivityContent?) -> Unit = { _, _ -> },
     savedChoiceRepository: SavedChoiceRepository = remember { SavedChoiceRepository() },
     movieRepository: MovieRepository = remember { NetworkModule.movieRepository },
     userProfileRepository: UserProfileRepository? = null
@@ -419,96 +418,8 @@ fun DeckScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp, vertical = 8.dp) // Minimal padding, let Scaffold handle the rest
     ) {
-        // Top header with settings icon and activity selector side by side
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Activity Selector (F-002) - show dropdown only if multiple activities, otherwise show text
-            if (activities.size > 1) {
-                // Multiple activities - show dropdown
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    OutlinedTextField(
-                        value = selectedActivity,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { 
-                            Icon(
-                                imageVector = Icons.Filled.KeyboardArrowDown,
-                                contentDescription = "Dropdown arrow"
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                            .clip(CardShape),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
-                        shape = CardShape
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        activities.forEach { activity ->
-                            DropdownMenuItem(
-                                text = { Text(activity) },
-                                onClick = {
-                                    selectedActivity = activity
-                                    expanded = false
-                                    android.util.Log.d("DeckScreen", "Activity selected: $activity")
-                                }
-                            )
-                        }
-                    }
-                }
-            } else {
-                // Single activity - show as text without dropdown
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(CardShape),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Text(
-                        text = selectedActivity,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            // Settings icon - positioned next to dropdown
-            IconButton(onClick = { 
-                android.util.Log.d("DeckScreen", "Settings icon tapped")
-                // TODO: Navigate to settings in later steps
-            }) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp)) // Minimal spacing to maximize card space
+        // Removed dropdown and settings icon to maximize card space
+        // Activity is now selected in onboarding (single activity only)
         
         // Error message display
         errorMessage?.let { message ->
@@ -561,9 +472,11 @@ fun DeckScreen(
         }
         
         // Swipeable Card (F-003) - Step 4 implementation with TMDB data and movie metadata
+        // Now with description for better card details in maximized space
         SwipeableCard(
             imageUrl = (currentCard["imageUrl"] as? String) ?: "",
             title = (currentCard["title"] as? String) ?: "",
+            description = (currentCard["description"] as? String) ?: "",
             onCardClick = {
                 val movieId = (currentCard["id"] as? String) ?: ""
                 val movieTitle = (currentCard["title"] as? String) ?: ""
@@ -571,7 +484,12 @@ fun DeckScreen(
                 android.util.Log.d("DeckScreen", "Current movie index: $currentMovieIndex, total movies: ${currentMovies.size}")
                 // Track navigation state to preserve movie list on return
                 hasNavigatedToDetail = true
-                onNavigateToDetail(movieId)
+                // Pass the actual movie object so DetailScreen has data immediately
+                val currentMovie = if (currentMovies.isNotEmpty() && currentMovieIndex < currentMovies.size) {
+                    currentMovies[currentMovieIndex]
+                } else null
+                android.util.Log.d("DeckScreen", "Passing movie to detail: ${currentMovie?.title ?: "null"} with ID: $movieId")
+                onNavigateToDetail(movieId, currentMovie)
             },
             onSwipeLeft = {
                 android.util.Log.d("DeckScreen", "Card declined via swipe left")
@@ -591,7 +509,7 @@ fun DeckScreen(
                 val savedChoice = SavedChoice.create(
                     id = (currentCard["id"] as? String) ?: "",
                     title = (currentCard["title"] as? String) ?: "",
-                    description = "", // Description removed for larger image preview
+                    description = (currentCard["description"] as? String) ?: "",
                     imageUrl = (currentCard["imageUrl"] as? String) ?: "",
                     activityType = (currentCard["activityType"] as? String) ?: ""
                 )
@@ -604,7 +522,7 @@ fun DeckScreen(
                 val savedChoice = SavedChoice.create(
                     id = (currentCard["id"] as? String) ?: "",
                     title = (currentCard["title"] as? String) ?: "",
-                    description = "", // Description removed for larger image preview
+                    description = (currentCard["description"] as? String) ?: "",
                     imageUrl = (currentCard["imageUrl"] as? String) ?: "",
                     activityType = (currentCard["activityType"] as? String) ?: ""
                 )

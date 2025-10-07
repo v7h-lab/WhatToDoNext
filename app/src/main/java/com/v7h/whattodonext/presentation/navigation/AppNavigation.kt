@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.v7h.whattodonext.presentation.ui.screen.deck.DeckScreen
 import com.v7h.whattodonext.presentation.ui.screen.detail.DetailScreen
 import com.v7h.whattodonext.presentation.ui.screen.savedchoices.SavedChoicesScreen
@@ -47,31 +49,12 @@ fun AppNavigation(
     
     // Shared repository instances with dependency injection
     val savedChoiceRepository = remember { SavedChoiceRepository() }
-    val userProfileRepository = remember { NetworkModule.provideUserProfileRepository(context) }
+    val userProfileRepository = remember { NetworkModule.legacyUserProfileRepository(context) }
     val movieRepository = remember { NetworkModule.movieRepository }
-    
-    // Check if user has completed onboarding
-    val userProfile by userProfileRepository.userProfile.collectAsState()
-    val hasCompletedOnboarding = userProfile.hasCompletedOnboarding
-    
-    // TEMPORARY DEBUG: Force show bottom nav for testing
-    val forceShowBottomNav = true // Set to false after testing
-    
-    // DEBUG: Add reset onboarding button in Profile screen
-    LaunchedEffect(Unit) {
-        // Uncomment the line below to reset onboarding for testing
-        // userProfileRepository.resetOnboarding()
-    }
     
     // Debug log for navigation setup
     LaunchedEffect(Unit) {
-        android.util.Log.d("AppNavigation", "Navigation system initialized - Onboarding completed: $hasCompletedOnboarding")
-        android.util.Log.d("AppNavigation", "User profile: ${userProfile.userId}, activities: ${userProfile.selectedActivities.size}")
-    }
-    
-    // Debug log for onboarding status changes
-    LaunchedEffect(hasCompletedOnboarding) {
-        android.util.Log.d("AppNavigation", "Onboarding status changed: $hasCompletedOnboarding")
+        android.util.Log.d("AppNavigation", "Navigation system initialized - Always starting with onboarding")
     }
     
     // Get current route for bottom navigation
@@ -82,9 +65,9 @@ fun AppNavigation(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            // F-007: Bottom Navigation Bar (hide during onboarding, show after)
-            android.util.Log.d("AppNavigation", "Bottom bar visibility check - hasCompletedOnboarding: $hasCompletedOnboarding, forceShow: $forceShowBottomNav")
-            if (hasCompletedOnboarding || forceShowBottomNav) {
+            // F-007: Bottom Navigation Bar (hide during onboarding, show after onboarding is completed in current session)
+            android.util.Log.d("AppNavigation", "Bottom bar visibility check - currentRoute: $currentRoute")
+            if (currentRoute != Screen.ONBOARDING) {
                 android.util.Log.d("AppNavigation", "Showing bottom navigation bar")
                 NavigationBar {
                     NavigationBarItem(
@@ -136,21 +119,21 @@ fun AppNavigation(
                     )
                 }
             } else {
-                android.util.Log.d("AppNavigation", "Hiding bottom navigation bar - onboarding not completed")
+                android.util.Log.d("AppNavigation", "Hiding bottom navigation bar - onboarding in progress")
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = if (hasCompletedOnboarding) Screen.DECK else Screen.ONBOARDING,
+            startDestination = Screen.ONBOARDING, // Always start with onboarding
             modifier = Modifier.padding(innerPadding)
         ) {
-            // S-001: Onboarding Screen (shown first if not completed)
+            // S-001: Onboarding Screen (always shown on app launch)
             composable(Screen.ONBOARDING) {
                 OnboardingScreen(
                     onOnboardingComplete = {
-                        // Complete onboarding and navigate to main app
-                        android.util.Log.d("AppNavigation", "Onboarding completed, navigating to main app")
+                        // Navigate to main app after user selects an activity
+                        android.util.Log.d("AppNavigation", "Onboarding completed for this session, navigating to main app")
                         
                         navController.navigate(Screen.DECK) {
                             popUpTo(Screen.ONBOARDING) { inclusive = true }
@@ -162,9 +145,13 @@ fun AppNavigation(
             // S-002: Main Deck Screen (primary interface)
             composable(Screen.DECK) {
                 DeckScreen(
-                    onNavigateToDetail = { contentId ->
-                        // Debug log for navigation
-                        android.util.Log.d("AppNavigation", "Navigating to detail: $contentId")
+                    onNavigateToDetail = { contentId, movieData ->
+                        // Debug log for navigation with movie data
+                        android.util.Log.d("AppNavigation", "Navigating to detail: $contentId with movie: ${movieData?.title ?: "null"}")
+                        
+                        // Store movie data in saved state handle for DetailScreen
+                        navController.currentBackStackEntry?.savedStateHandle?.set("movie_data", movieData)
+                        
                         navController.navigate(Screen.detailRoute(contentId))
                     },
                     savedChoiceRepository = savedChoiceRepository,
@@ -173,21 +160,39 @@ fun AppNavigation(
             }
             
             // S-003: Detail Screen (expanded card view)
+            // Rule: Proper navigation argument configuration to prevent stale state
             composable(
                 route = Screen.detailRoute("{${Screen.Params.ACTIVITY_CONTENT_ID}}"),
-                arguments = emptyList() // TODO: Add proper arguments in later steps
+                arguments = listOf(
+                    navArgument(Screen.Params.ACTIVITY_CONTENT_ID) {
+                        type = NavType.StringType
+                        nullable = false
+                    }
+                )
             ) { backStackEntry ->
+                // Extract contentId from navigation arguments
                 val contentId = backStackEntry.arguments?.getString(Screen.Params.ACTIVITY_CONTENT_ID) ?: ""
                 
-                DetailScreen(
-                    contentId = contentId,
-                    onNavigateBack = {
-                        // Debug log for navigation
-                        android.util.Log.d("AppNavigation", "Navigating back from detail")
-                        navController.popBackStack()
-                    },
-                    movieRepository = movieRepository
-                )
+                // Get movie data from previous screen's saved state
+                val previousEntry = navController.previousBackStackEntry
+                val movieData = previousEntry?.savedStateHandle?.get<com.v7h.whattodonext.data.model.ActivityContent>("movie_data")
+                
+                android.util.Log.d("AppNavigation", "Detail screen route matched with contentId: $contentId, has movie data: ${movieData != null}")
+                
+                // Use key to force recreation of DetailScreen when contentId changes
+                // This prevents state from previous screen being reused
+                key(contentId) {
+                    DetailScreen(
+                        contentId = contentId,
+                        initialMovieData = movieData,
+                        onNavigateBack = {
+                            // Debug log for navigation
+                            android.util.Log.d("AppNavigation", "Navigating back from detail")
+                            navController.popBackStack()
+                        },
+                        movieRepository = movieRepository
+                    )
+                }
             }
             
             // S-004: Saved Choices Screen

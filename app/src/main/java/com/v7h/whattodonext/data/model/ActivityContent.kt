@@ -1,5 +1,8 @@
 package com.v7h.whattodonext.data.model
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * D-003: ActivityContent - Represents content for a single card
  * 
@@ -7,9 +10,11 @@ package com.v7h.whattodonext.data.model
  * - Movies, restaurants, outdoor activities, etc.
  * - Fetched from external sources (TMDB API, etc.)
  * - Used throughout the app for displaying options
+ * - Parcelable for state preservation across navigation/configuration changes
  * 
- * Applied Rules: Debug logs, comments, flexible data structure
+ * Applied Rules: Debug logs, comments, flexible data structure, Parcelable for crash prevention
  */
+@Parcelize
 data class ActivityContent(
     val id: String,
     val title: String,
@@ -17,7 +22,7 @@ data class ActivityContent(
     val imageUrl: String?,
     val category: String,
     val metadata: Map<String, String> = emptyMap()
-) {
+) : Parcelable {
     // Debug helper
     fun logContent() {
         android.util.Log.d("ActivityContent", "Content: $title ($category) - $id")

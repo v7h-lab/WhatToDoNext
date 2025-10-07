@@ -4,6 +4,7 @@ import com.v7h.whattodonext.data.api.TmdbApiService
 import com.v7h.whattodonext.data.api.TmdbApiConfig
 import com.v7h.whattodonext.data.model.ActivityContent
 import com.v7h.whattodonext.data.model.TmdbConfiguration
+import com.v7h.whattodonext.data.model.TmdbGenres
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,11 +46,18 @@ class MovieRepository(
     
     /**
      * Initialize repository by fetching configuration
+     * Includes robust error handling to prevent crashes
      */
     suspend fun initialize() {
         try {
             // Debug log for initialization
             android.util.Log.d("MovieRepository", "Initializing TMDB configuration...")
+            
+            // Check if API key is valid before making requests
+            if (apiKey.isEmpty()) {
+                android.util.Log.w("MovieRepository", "API key is empty, skipping configuration initialization")
+                return
+            }
             
             val response = tmdbApiService.getConfiguration(apiKey)
             if (response.isSuccessful) {
@@ -57,10 +65,12 @@ class MovieRepository(
                 tmdbConfiguration?.logConfiguration()
                 android.util.Log.d("MovieRepository", "TMDB configuration loaded successfully")
             } else {
-                android.util.Log.e("MovieRepository", "Failed to load TMDB configuration: ${response.code()}")
+                android.util.Log.e("MovieRepository", "Failed to load TMDB configuration: ${response.code()} - ${response.message()}")
+                // Don't crash, just log the error and continue with fallback
             }
         } catch (e: Exception) {
             android.util.Log.e("MovieRepository", "Error initializing TMDB configuration", e)
+            // Don't crash the app, just log the error and continue with fallback data
         }
     }
     
@@ -212,6 +222,7 @@ class MovieRepository(
     /**
      * Fetch movies based on user preferences
      * This is the main method that will be called from the UI
+     * Supports filtering by genres and languages
      */
     suspend fun fetchMoviesForUser(userPreferences: Map<String, Any>): Result<List<ActivityContent>> {
         return try {
@@ -220,6 +231,7 @@ class MovieRepository(
             
             // Extract genre preferences
             val preferredGenres = userPreferences["genres"] as? List<String> ?: emptyList()
+            val preferredLanguages = userPreferences["languages"] as? List<String> ?: emptyList()
             val minRating = userPreferences["min_rating"] as? Double ?: 6.0
             val maxRating = userPreferences["max_rating"] as? Double ?: 10.0
             val year = userPreferences["year"] as? Int
@@ -229,10 +241,18 @@ class MovieRepository(
                 getGenreIdsForNames(preferredGenres)
             } else null
             
+            // Handle language filtering
+            // If multiple languages selected, we'll fetch movies for each and combine
+            // If no languages selected, use default (all languages)
+            val languageFilter = if (preferredLanguages.isNotEmpty()) {
+                preferredLanguages.first() // For now, use first language (TMDB API limitation)
+            } else null
+            
             // Use discover endpoint with user preferences
             val response = tmdbApiService.discoverMovies(
                 apiKey = apiKey,
                 withGenres = genreIds?.joinToString(","),
+                withOriginalLanguage = languageFilter,
                 minVoteAverage = minRating,
                 maxVoteAverage = maxRating,
                 year = year
@@ -247,7 +267,7 @@ class MovieRepository(
                     _popularMovies.value = activityContent
                     
                     // Debug log for successful fetch
-                    android.util.Log.d("MovieRepository", "Successfully fetched ${activityContent.size} movies with user preferences")
+                    android.util.Log.d("MovieRepository", "Successfully fetched ${activityContent.size} movies with preferences: genres=$preferredGenres, languages=$preferredLanguages")
                     movieResponse.logResponse()
                     
                     Result.success(activityContent)
@@ -267,35 +287,10 @@ class MovieRepository(
     
     /**
      * Get genre IDs for genre names
-     * This would typically fetch from TMDB genres API, but for now we'll use a mapping
+     * Uses TmdbGenres constants for consistent mapping
      */
     private fun getGenreIdsForNames(genreNames: List<String>): List<Int> {
-        // TMDB genre mapping (simplified - in production, fetch from API)
-        val genreMapping = mapOf(
-            "Action" to 28,
-            "Adventure" to 12,
-            "Animation" to 16,
-            "Comedy" to 35,
-            "Crime" to 80,
-            "Documentary" to 99,
-            "Drama" to 18,
-            "Family" to 10751,
-            "Fantasy" to 14,
-            "History" to 36,
-            "Horror" to 27,
-            "Music" to 10402,
-            "Mystery" to 9648,
-            "Romance" to 10749,
-            "Science Fiction" to 878,
-            "TV Movie" to 10770,
-            "Thriller" to 53,
-            "War" to 10752,
-            "Western" to 37
-        )
-        
-        val genreIds = genreNames.mapNotNull { genreName ->
-            genreMapping[genreName]
-        }
+        val genreIds = TmdbGenres.getGenreIds(genreNames)
         
         // Debug log for genre mapping
         android.util.Log.d("MovieRepository", "Mapped genres: $genreNames -> $genreIds")

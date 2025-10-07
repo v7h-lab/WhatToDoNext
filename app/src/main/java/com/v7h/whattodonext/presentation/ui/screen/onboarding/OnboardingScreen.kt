@@ -20,6 +20,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.v7h.whattodonext.data.model.ActivityType
 import com.v7h.whattodonext.data.model.DefaultActivities
+import com.v7h.whattodonext.data.model.TmdbGenres
+import com.v7h.whattodonext.data.model.TmdbLanguages
 import com.v7h.whattodonext.presentation.theme.WhatToDoNextTheme
 import com.v7h.whattodonext.presentation.theme.CardShape
 
@@ -31,7 +33,11 @@ import com.v7h.whattodonext.presentation.theme.CardShape
  * - Step-by-step process for first-time users
  * - Activity selection with preferences setup
  * 
- * Applied Rules: Debug logs, comments, StateFlow for state management
+ * Updated flow:
+ * - Step 1: Activity selection ("What to do next")
+ * - Step 2: Activity-specific preferences (e.g., genres & languages for Movies)
+ * 
+ * Applied Rules: Debug logs, comments, StateFlow for state management, flexible architecture for future activities
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +47,9 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     var currentStep by remember { mutableStateOf(0) }
-    var selectedActivities by remember { mutableStateOf(setOf<ActivityType>()) }
+    var selectedActivity by remember { mutableStateOf<ActivityType?>(null) }
+    var selectedGenres by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedLanguages by remember { mutableStateOf<List<String>>(emptyList()) }
     var isCompletingOnboarding by remember { mutableStateOf(false) }
     
     // Debug log for onboarding start
@@ -51,15 +59,25 @@ fun OnboardingScreen(
     
     // Handle onboarding completion with repository
     LaunchedEffect(isCompletingOnboarding) {
-        if (isCompletingOnboarding && userProfileRepository != null) {
+        if (isCompletingOnboarding && userProfileRepository != null && selectedActivity != null) {
             try {
-                // Update selected activities in the repository
-                userProfileRepository.updateSelectedActivities(selectedActivities.toList())
+                // Update selected activity in the repository
+                userProfileRepository.updateSelectedActivities(listOf(selectedActivity!!))
                 
-                // Mark onboarding as completed
-                userProfileRepository.completeOnboarding()
+                // Save activity preferences (genres and languages for movies)
+                if (selectedActivity!!.id == "movies" && (selectedGenres.isNotEmpty() || selectedLanguages.isNotEmpty())) {
+                    val preferences = com.v7h.whattodonext.data.model.ActivityPreferences(
+                        activityId = "movies",
+                        filters = mapOf(
+                            "genres" to selectedGenres,
+                            "languages" to selectedLanguages
+                        )
+                    )
+                    userProfileRepository.updateActivityPreferences("movies", preferences)
+                    android.util.Log.d("OnboardingScreen", "Saved movie preferences: genres=$selectedGenres, languages=$selectedLanguages")
+                }
                 
-                android.util.Log.d("OnboardingScreen", "Successfully saved ${selectedActivities.size} activities and marked onboarding complete")
+                android.util.Log.d("OnboardingScreen", "Successfully saved selected activity: ${selectedActivity!!.name}")
                 
                 // Navigate to main app
                 onOnboardingComplete()
@@ -71,8 +89,15 @@ fun OnboardingScreen(
         } else if (isCompletingOnboarding && userProfileRepository == null) {
             android.util.Log.w("OnboardingScreen", "No userProfileRepository provided, completing onboarding without saving")
             onOnboardingComplete()
+        } else if (isCompletingOnboarding && selectedActivity == null) {
+            android.util.Log.w("OnboardingScreen", "No activity selected, completing onboarding without saving")
+            onOnboardingComplete()
         }
     }
+    
+    // Calculate total steps based on selected activity
+    val totalSteps = if (selectedActivity?.id == "movies") 2 else 2 // Future: other activities may have preferences too
+    val currentStepNumber = currentStep + 1
     
     Column(
         modifier = modifier
@@ -81,9 +106,9 @@ fun OnboardingScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Progress indicator
+        // Progress indicator (dynamic based on activity type)
         LinearProgressIndicator(
-            progress = (currentStep + 1) / 3f, // 3 steps total
+            progress = currentStepNumber.toFloat() / totalSteps.toFloat(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp)
@@ -93,106 +118,82 @@ fun OnboardingScreen(
         )
         
         when (currentStep) {
-            0 -> WelcomeStep(
+            0 -> ActivitySelectionStep(
+                selectedActivity = selectedActivity,
+                onActivityChanged = { selectedActivity = it },
                 onNext = { 
-                    currentStep = 1
-                    android.util.Log.d("OnboardingScreen", "Moving to step 1")
+                    // Check if selected activity needs preferences screen
+                    if (selectedActivity?.id == "movies") {
+                        currentStep = 1
+                        android.util.Log.d("OnboardingScreen", "Moving to preferences for: ${selectedActivity?.name}")
+                    } else {
+                        // Skip preferences for activities that don't need them (for now)
+                        android.util.Log.d("OnboardingScreen", "No preferences needed for ${selectedActivity?.name}, completing onboarding")
+                        isCompletingOnboarding = true
+                    }
                 }
             )
-            1 -> ActivitySelectionStep(
-                selectedActivities = selectedActivities,
-                onActivitiesChanged = { selectedActivities = it },
-                onNext = { 
-                    currentStep = 2
-                    android.util.Log.d("OnboardingScreen", "Moving to step 2 with ${selectedActivities.size} activities")
+            1 -> {
+                // Activity-specific preferences screen
+                when (selectedActivity?.id) {
+                    "movies" -> MoviePreferencesStep(
+                        selectedGenres = selectedGenres,
+                        selectedLanguages = selectedLanguages,
+                        onGenresChanged = { selectedGenres = it },
+                        onLanguagesChanged = { selectedLanguages = it },
+                        onComplete = {
+                            android.util.Log.d("OnboardingScreen", "Movie preferences completed: genres=$selectedGenres, languages=$selectedLanguages")
+                            isCompletingOnboarding = true
+                        },
+                        onBack = {
+                            currentStep = 0
+                            android.util.Log.d("OnboardingScreen", "Going back to activity selection")
+                        }
+                    )
+                    // Future: Add preference screens for other activities here
+                    else -> {
+                        // Fallback: complete onboarding if no preference screen exists
+                        LaunchedEffect(Unit) {
+                            isCompletingOnboarding = true
+                        }
+                    }
                 }
-            )
-            2 -> CompletionStep(
-                selectedActivities = selectedActivities,
-                onComplete = {
-                    android.util.Log.d("OnboardingScreen", "Onboarding completed with ${selectedActivities.size} activities")
-                    isCompletingOnboarding = true
-                }
-            )
+            }
         }
     }
 }
 
 /**
- * Step 1: Welcome and introduction
- */
-@Composable
-private fun WelcomeStep(
-    onNext: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Welcome title
-        Text(
-            text = "Welcome to\nWhat To Do Next",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        // Description
-        Text(
-            text = "Let's help you make decisions faster by setting up your personalized activity preferences.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 48.dp)
-        )
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Next button
-        Button(
-            onClick = onNext,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Get Started")
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.ArrowForward, contentDescription = null)
-        }
-    }
-}
-
-/**
- * Step 2: Activity selection
+ * Step 1: Activity selection (single selection only)
+ * First screen with "What to do next" title
  */
 @Composable
 private fun ActivitySelectionStep(
-    selectedActivities: Set<ActivityType>,
-    onActivitiesChanged: (Set<ActivityType>) -> Unit,
+    selectedActivity: ActivityType?,
+    onActivityChanged: (ActivityType) -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.fillMaxWidth()
     ) {
-        // Step title
+        // Step title - "What to do next"
         Text(
-            text = "Choose Your Interests",
-            style = MaterialTheme.typography.headlineMedium,
+            text = "What to do next?",
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         
         Text(
-            text = "Select the activities you'd like to discover options for:",
+            text = "Select one activity you'd like to discover options for:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp)
         )
         
-        // Activity selection grid
+        // Activity selection grid (single selection)
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f)
@@ -205,15 +206,11 @@ private fun ActivitySelectionStep(
                     activityRow.forEach { activity ->
                         ActivitySelectionCard(
                             activity = activity,
-                            isSelected = selectedActivities.contains(activity),
+                            isSelected = selectedActivity == activity,
                             onToggle = {
-                                val newSelection = if (selectedActivities.contains(activity)) {
-                                    selectedActivities - activity
-                                } else {
-                                    selectedActivities + activity
-                                }
-                                onActivitiesChanged(newSelection)
-                                android.util.Log.d("OnboardingScreen", "Activity ${activity.name} toggled: ${!selectedActivities.contains(activity)}")
+                                // Single selection: always set to the clicked activity
+                                onActivityChanged(activity)
+                                android.util.Log.d("OnboardingScreen", "Activity selected: ${activity.name}")
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -224,13 +221,13 @@ private fun ActivitySelectionStep(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Next button (enabled only if at least one activity is selected)
+        // Next button (enabled only if one activity is selected)
         Button(
             onClick = onNext,
-            enabled = selectedActivities.isNotEmpty(),
+            enabled = selectedActivity != null,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue (${selectedActivities.size} selected)")
+            Text("Continue" + if (selectedActivity != null) " with ${selectedActivity.name}" else "")
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.Default.ArrowForward, contentDescription = null)
         }
@@ -238,78 +235,158 @@ private fun ActivitySelectionStep(
 }
 
 /**
- * Step 3: Completion summary
+ * Step 2: Movie Preferences - Genre and Language selection
+ * Multi-select for genres and languages from TMDB
  */
 @Composable
-private fun CompletionStep(
-    selectedActivities: Set<ActivityType>,
+private fun MoviePreferencesStep(
+    selectedGenres: List<String>,
+    selectedLanguages: List<String>,
+    onGenresChanged: (List<String>) -> Unit,
+    onLanguagesChanged: (List<String>) -> Unit,
     onComplete: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // TMDB movie genres (from TmdbConstants)
+    val availableGenres = TmdbGenres.getAllGenreNames()
+    
+    // TMDB supported languages (from TmdbConstants with valid API codes)
+    val availableLanguages = TmdbLanguages.LANGUAGES
+    
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier.fillMaxWidth()
     ) {
-        // Success icon
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = null,
-            modifier = Modifier
-                .size(64.dp)
-                .padding(bottom = 24.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        
-        // Completion title
+        // Step title
         Text(
-            text = "All Set!",
+            text = "Movie Preferences",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
-        // Summary
         Text(
-            text = "You've selected ${selectedActivities.size} activities to discover:",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
+            text = "Select your preferred genres and languages:",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp)
         )
         
-        // Selected activities list
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 48.dp)
+        // Scrollable content
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.weight(1f)
         ) {
-            items(selectedActivities.toList()) { activity ->
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+            // Genres section
+            item {
+                Text(
+                    text = "Genres",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            
+            item {
+                // Genre chips in a flow layout
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "${activity.icon} ${activity.name}",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    items(availableGenres.chunked(3)) { genreRow ->
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            genreRow.forEach { genre ->
+                                FilterChip(
+                                    selected = selectedGenres.contains(genre),
+                                    onClick = {
+                                        if (selectedGenres.contains(genre)) {
+                                            onGenresChanged(selectedGenres - genre)
+                                        } else {
+                                            onGenresChanged(selectedGenres + genre)
+                                        }
+                                        android.util.Log.d("MoviePreferences", "Genre toggled: $genre, selected=${!selectedGenres.contains(genre)}")
+                                    },
+                                    label = { Text(genre) },
+                                    leadingIcon = if (selectedGenres.contains(genre)) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Languages section
+            item {
+                Text(
+                    text = "Languages",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
+            }
+            
+            item {
+                // Language chips in a flow layout
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(availableLanguages.chunked(3)) { langRow ->
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            langRow.forEach { (code, name) ->
+                                FilterChip(
+                                    selected = selectedLanguages.contains(code),
+                                    onClick = {
+                                        if (selectedLanguages.contains(code)) {
+                                            onLanguagesChanged(selectedLanguages - code)
+                                        } else {
+                                            onLanguagesChanged(selectedLanguages + code)
+                                        }
+                                        android.util.Log.d("MoviePreferences", "Language toggled: $name ($code), selected=${!selectedLanguages.contains(code)}")
+                                    },
+                                    label = { Text(name) },
+                                    leadingIcon = if (selectedLanguages.contains(code)) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
         
-        // Complete button
-        Button(
-            onClick = onComplete,
-            modifier = Modifier.fillMaxWidth()
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Start Exploring")
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.ArrowForward, contentDescription = null)
+            // Back button
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Back")
+            }
+            
+            // Continue button (enabled even if no selection for flexibility)
+            Button(
+                onClick = onComplete,
+                modifier = Modifier.weight(2f)
+            ) {
+                Text("Start Exploring")
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(Icons.Default.ArrowForward, contentDescription = null)
+            }
         }
     }
 }

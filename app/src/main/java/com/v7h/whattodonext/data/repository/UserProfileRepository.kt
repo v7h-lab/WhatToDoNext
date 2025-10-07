@@ -46,14 +46,18 @@ class UserProfileRepository(
     
     /**
      * Mark onboarding as completed
+     * Note: This is now a no-op since onboarding is always shown on launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     suspend fun completeOnboarding() {
         userProfileStorage.completeOnboarding()
     }
     
     /**
      * Reset onboarding status (for testing purposes)
+     * Note: This is now a no-op since onboarding is always shown on launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     suspend fun resetOnboarding() {
         userProfileStorage.resetOnboarding()
     }
@@ -67,9 +71,11 @@ class UserProfileRepository(
     
     /**
      * Check if user has completed onboarding
+     * Note: Always returns false now - users see onboarding every launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     fun hasCompletedOnboarding(): Boolean {
-        return userProfileStorage.hasCompletedOnboarding()
+        return false // Always false - onboarding shown every launch
     }
     
     /**

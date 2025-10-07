@@ -23,11 +23,19 @@ class SavedChoiceRepository {
     
     /**
      * Add a new saved choice when user swipes right
+     * Prevents duplicates by checking if ID already exists
      */
     fun addSavedChoice(choice: SavedChoice) {
         android.util.Log.d("SavedChoiceRepository", "Adding saved choice: ${choice.title}")
         
         val currentList = _savedChoices.value.toMutableList()
+        
+        // Check for duplicates before adding - prevent crash from duplicate keys
+        if (currentList.any { it.id == choice.id }) {
+            android.util.Log.w("SavedChoiceRepository", "Duplicate choice detected: ${choice.id} - ${choice.title}. Skipping.")
+            return
+        }
+        
         currentList.add(choice)
         _savedChoices.value = currentList
         

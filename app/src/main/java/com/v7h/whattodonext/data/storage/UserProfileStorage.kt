@@ -49,15 +49,15 @@ class UserProfileStorage(private val context: Context) {
     
     /**
      * Load user profile from SharedPreferences
+     * Note: Onboarding completion is no longer tracked - users see onboarding every launch
      */
     private fun loadUserProfile(): UserProfile {
         return try {
             val userId = prefs.getString(KEY_USER_ID, "default_user") ?: "default_user"
-            val hasCompletedOnboarding = prefs.getBoolean(KEY_HAS_COMPLETED_ONBOARDING, false) // Default to false for new users
             val createdAt = prefs.getLong(KEY_CREATED_AT, System.currentTimeMillis())
             val updatedAt = prefs.getLong(KEY_UPDATED_AT, System.currentTimeMillis())
             
-            // Load selected activities
+            // Load selected activities (now single activity stored as list with 1 item)
             val selectedActivitiesJson = prefs.getString(KEY_SELECTED_ACTIVITIES, null)
             val selectedActivities = if (selectedActivitiesJson != null) {
                 try {
@@ -89,13 +89,13 @@ class UserProfileStorage(private val context: Context) {
                 userId = userId,
                 selectedActivities = selectedActivities,
                 activityPreferences = activityPreferences,
-                hasCompletedOnboarding = hasCompletedOnboarding,
+                hasCompletedOnboarding = false, // Always false - onboarding shown every launch
                 createdAt = createdAt,
                 updatedAt = updatedAt
             )
             
             // Debug log for profile loading
-            android.util.Log.d("UserProfileStorage", "Loaded user profile: ${selectedActivities.size} activities, onboarding: $hasCompletedOnboarding")
+            android.util.Log.d("UserProfileStorage", "Loaded user profile: ${selectedActivities.size} activities")
             
             profile
         } catch (e: Exception) {
@@ -107,6 +107,7 @@ class UserProfileStorage(private val context: Context) {
     
     /**
      * Save user profile to SharedPreferences
+     * Note: hasCompletedOnboarding is always set to false - not persisted
      */
     suspend fun saveUserProfile(profile: UserProfile) {
         try {
@@ -115,11 +116,11 @@ class UserProfileStorage(private val context: Context) {
             
             prefs.edit().apply {
                 putString(KEY_USER_ID, profile.userId)
-                putBoolean(KEY_HAS_COMPLETED_ONBOARDING, profile.hasCompletedOnboarding)
+                // Note: Not saving hasCompletedOnboarding - always false on load
                 putLong(KEY_CREATED_AT, profile.createdAt)
                 putLong(KEY_UPDATED_AT, profile.updatedAt)
                 
-                // Save selected activities as JSON
+                // Save selected activities as JSON (single activity as list)
                 val selectedActivitiesJson = gson.toJson(profile.selectedActivities)
                 putString(KEY_SELECTED_ACTIVITIES, selectedActivitiesJson)
                 
@@ -142,13 +143,14 @@ class UserProfileStorage(private val context: Context) {
     }
     
     /**
-     * Update selected activities
+     * Update selected activities (now supports single activity selection)
      */
     suspend fun updateSelectedActivities(activities: List<ActivityType>) {
         val currentProfile = _userProfile.value
         val updatedProfile = currentProfile.copy(
             selectedActivities = activities,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = System.currentTimeMillis(),
+            hasCompletedOnboarding = false // Always false - onboarding shown every launch
         )
         saveUserProfile(updatedProfile)
         
@@ -176,32 +178,22 @@ class UserProfileStorage(private val context: Context) {
     
     /**
      * Mark onboarding as completed
+     * Note: This is now a no-op since onboarding is always shown on launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     suspend fun completeOnboarding() {
-        val currentProfile = _userProfile.value
-        val updatedProfile = currentProfile.copy(
-            hasCompletedOnboarding = true,
-            updatedAt = System.currentTimeMillis()
-        )
-        saveUserProfile(updatedProfile)
-        
-        // Debug log for onboarding completion
-        android.util.Log.d("UserProfileStorage", "Onboarding completed for user: ${currentProfile.userId}")
+        // No-op - onboarding is always shown on launch
+        android.util.Log.d("UserProfileStorage", "completeOnboarding called but ignored - onboarding shown every launch")
     }
     
     /**
      * Reset onboarding status (for testing purposes)
+     * Note: This is now a no-op since onboarding is always shown on launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     suspend fun resetOnboarding() {
-        val currentProfile = _userProfile.value
-        val updatedProfile = currentProfile.copy(
-            hasCompletedOnboarding = false,
-            updatedAt = System.currentTimeMillis()
-        )
-        saveUserProfile(updatedProfile)
-        
-        // Debug log for onboarding reset
-        android.util.Log.d("UserProfileStorage", "Onboarding reset for user: ${currentProfile.userId}")
+        // No-op - onboarding is always shown on launch
+        android.util.Log.d("UserProfileStorage", "resetOnboarding called but ignored - onboarding shown every launch")
     }
     
     /**
@@ -213,9 +205,11 @@ class UserProfileStorage(private val context: Context) {
     
     /**
      * Check if user has completed onboarding
+     * Note: Always returns false now - users see onboarding every launch
      */
+    @Deprecated("Onboarding completion is no longer tracked - users see onboarding every launch")
     fun hasCompletedOnboarding(): Boolean {
-        return _userProfile.value.hasCompletedOnboarding
+        return false // Always false - onboarding shown every launch
     }
     
     /**

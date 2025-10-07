@@ -31,90 +31,144 @@ import kotlinx.coroutines.launch
  * Contains:
  * - F-004: Detail Screen View (extended activity-specific info)
  * 
- * This screen shows detailed information about the selected activity,
- * such as extended descriptions, additional images, location details, etc.
+ * Applied Rules: 
+ * - State Management: Local state with proper scoping
+ * - LaunchedEffect for data fetching
+ * - Debug logs & comments
+ * 
+ * This screen shows detailed information about the selected activity.
+ * State is properly scoped to contentId to prevent stale data.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     contentId: String,
+    initialMovieData: ActivityContent? = null,
     onNavigateBack: () -> Unit,
     movieRepository: MovieRepository = remember { NetworkModule.movieRepository },
     modifier: Modifier = Modifier
 ) {
-    // Coroutine scope for API calls
-    val scope = rememberCoroutineScope()
+    android.util.Log.d("DetailScreen", "DetailScreen COMPOSING for contentId: $contentId with initial data: ${initialMovieData?.title ?: "null"}")
     
-    // State for movie data
-    var movieData by remember { mutableStateOf<ActivityContent?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    
-    LaunchedEffect(contentId) {
-        android.util.Log.d("DetailScreen", "Detail screen loaded for content: $contentId")
+    // Use produceState for state management tied to contentId
+    // If we have initial data, use it immediately, otherwise fetch
+    val movieState by produceState<MovieState>(
+        initialValue = if (initialMovieData != null) {
+            android.util.Log.d("DetailScreen", "Using INITIAL movie data: ${initialMovieData.title}")
+            MovieState.Success(initialMovieData)
+        } else {
+            MovieState.Loading
+        },
+        key1 = contentId,
+        key2 = initialMovieData
+    ) {
+        android.util.Log.d("DetailScreen", "=== produceState for contentId: $contentId, hasInitialData: ${initialMovieData != null}")
         
-        if (contentId.startsWith("movie_")) {
-            isLoading = true
-            errorMessage = null
-            
-            try {
+        // If we already have initial data, don't fetch again
+        if (initialMovieData != null) {
+            android.util.Log.d("DetailScreen", "✓ Using provided movie data, no fetch needed")
+            value = MovieState.Success(initialMovieData)
+            return@produceState
+        }
+        
+        android.util.Log.d("DetailScreen", "No initial data provided, fetching...")
+        value = MovieState.Loading
+        
+        try {
+            if (contentId.startsWith("movie_")) {
                 // Initialize repository if needed
                 movieRepository.initialize()
+                
+                android.util.Log.d("DetailScreen", "Searching for movie in cached data...")
                 
                 // Try to find the movie in the cached data
                 val allMovies = movieRepository.popularMovies.value + 
                                movieRepository.topRatedMovies.value + 
                                movieRepository.nowPlayingMovies.value
                 
+                android.util.Log.d("DetailScreen", "Total cached movies: ${allMovies.size}")
                 val foundMovie = allMovies.find { it.id == contentId }
                 
                 if (foundMovie != null) {
-                    movieData = foundMovie
-                    isLoading = false
-                    android.util.Log.d("DetailScreen", "Found movie in cache: ${foundMovie.title}")
+                    android.util.Log.d("DetailScreen", "✓ FOUND in cache: ${foundMovie.title} for contentId: $contentId")
+                    value = MovieState.Success(foundMovie)
                 } else {
+                    android.util.Log.w("DetailScreen", "✗ NOT FOUND in cache, fetching from API for: $contentId")
+                    
                     // If not found in cache, try to fetch popular movies to get more data
                     val result = movieRepository.fetchPopularMovies()
                     result.fold(
                         onSuccess = { movies ->
                             val foundInNewData = movies.find { it.id == contentId }
                             if (foundInNewData != null) {
-                                movieData = foundInNewData
-                                android.util.Log.d("DetailScreen", "Found movie in fresh data: ${foundInNewData.title}")
+                                android.util.Log.d("DetailScreen", "✓ FOUND in fresh data: ${foundInNewData.title} for contentId: $contentId")
+                                value = MovieState.Success(foundInNewData)
                             } else {
-                                android.util.Log.w("DetailScreen", "Movie not found: $contentId")
-                                errorMessage = "Movie not found"
+                                android.util.Log.e("DetailScreen", "✗ Movie not found anywhere: $contentId")
+                                value = MovieState.Error("Movie not found")
                             }
-                            isLoading = false
                         },
                         onFailure = { error ->
-                            android.util.Log.e("DetailScreen", "Failed to fetch movies", error)
-                            errorMessage = "Failed to load movie details"
-                            isLoading = false
+                            android.util.Log.e("DetailScreen", "✗ Failed to fetch movies for $contentId", error)
+                            value = MovieState.Error("Failed to load movie details")
                         }
                     )
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("DetailScreen", "Exception loading movie data", e)
-                errorMessage = "Error loading movie details"
-                isLoading = false
+            } else {
+                // Non-movie content
+                value = MovieState.Success(null)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DetailScreen", "✗ Exception loading movie data for $contentId", e)
+            value = MovieState.Error("Error loading movie details")
+        }
+    }
+    
+    // Create activity details based on movieState
+    val activityDetails = remember(movieState, contentId) {
+        when (movieState) {
+            is MovieState.Loading -> {
+                android.util.Log.d("DetailScreen", "LOADING state - showing placeholder for $contentId")
+                ActivityDetails(
+                    id = contentId,
+                    title = "Loading...",
+                    description = "Please wait...",
+                    imageUrl = "",
+                    extendedDescription = "",
+                    location = "",
+                    estimatedDuration = "",
+                    difficulty = "",
+                    category = "Movies",
+                    metadata = emptyMap()
+                )
+            }
+            is MovieState.Success -> {
+                val movieData = (movieState as MovieState.Success).movie
+                if (movieData != null) {
+                    android.util.Log.d("DetailScreen", "SUCCESS state - showing REAL data: ${movieData.title} for contentId: $contentId")
+                    createMovieDetailsFromData(movieData)
+                } else if (contentId.startsWith("movie_")) {
+                    android.util.Log.d("DetailScreen", "SUCCESS state - showing FALLBACK for contentId: $contentId")
+                    createMovieDetails(contentId)
+                } else {
+                    android.util.Log.d("DetailScreen", "SUCCESS state - showing NON-MOVIE for contentId: $contentId")
+                    createParkActivityDetails(contentId)
+                }
+            }
+            is MovieState.Error -> {
+                android.util.Log.d("DetailScreen", "ERROR state - showing fallback for contentId: $contentId")
+                if (contentId.startsWith("movie_")) {
+                    createMovieDetails(contentId)
+                } else {
+                    createParkActivityDetails(contentId)
+                }
             }
         }
     }
     
-    // Create activity details from fetched data or fallback
-    val activityDetails = remember(movieData, contentId) {
-        if (movieData != null) {
-            // Use real movie data
-            createMovieDetailsFromData(movieData!!)
-        } else if (contentId.startsWith("movie_")) {
-            // Fallback for movies
-            createMovieDetails(contentId)
-        } else {
-            // Fallback to park activity for non-movie content
-            createParkActivityDetails(contentId)
-        }
-    }
+    android.util.Log.d("DetailScreen", "Final render: ${activityDetails.title} for contentId: $contentId")
+    
+    val isLoading = movieState is MovieState.Loading
     
     // Custom layout without Scaffold to have full control over spacing
     Column(
@@ -135,14 +189,14 @@ fun DetailScreen(
                 // Back button
                 IconButton(
                     onClick = {
-                        android.util.Log.d("DetailScreen", "Back button tapped - returning to: ${activityDetails.title}")
+                        android.util.Log.d("DetailScreen", "Back button tapped - returning from: ${activityDetails.title}")
                         onNavigateBack()
                     },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back to ${activityDetails.title}",
+                        contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -160,8 +214,17 @@ fun DetailScreen(
                         .padding(horizontal = 8.dp)
                 )
                 
-                // Empty space on the right to balance the back button (48dp)
-                Spacer(modifier = Modifier.width(48.dp))
+                // Show loading indicator when fetching data
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    // Empty space on the right to balance the back button (48dp)
+                    Spacer(modifier = Modifier.width(48.dp))
+                }
             }
         }
         
@@ -583,6 +646,16 @@ private fun createParkActivityDetails(contentId: String): ActivityDetails {
         difficulty = "Easy",
         category = "Outdoor activities"
     )
+}
+
+/**
+ * Sealed class for movie loading state
+ * Applied Rules: Type-safe state management
+ */
+private sealed class MovieState {
+    object Loading : MovieState()
+    data class Success(val movie: ActivityContent?) : MovieState()
+    data class Error(val message: String) : MovieState()
 }
 
 @Preview(showBackground = true)
