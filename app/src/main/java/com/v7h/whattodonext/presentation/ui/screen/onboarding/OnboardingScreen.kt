@@ -423,7 +423,7 @@ private fun ActivitySelectionCard(
 ) {
     Card(
         modifier = modifier
-            .height(160.dp) // Fixed height for all cards
+            .height(180.dp) // Increased height for more prominent emoji
             .fillMaxWidth() // Fixed width to fill available space
             .clickable { onToggle() },
         shape = CardShape,
@@ -445,10 +445,13 @@ private fun ActivitySelectionCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Prominent emoji display with larger size
             Text(
                 text = activity.icon,
-                style = MaterialTheme.typography.displaySmall,
-                modifier = Modifier.padding(bottom = 8.dp)
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = MaterialTheme.typography.displayLarge.fontSize * 1.3f // 30% larger for prominence
+                ),
+                modifier = Modifier.padding(bottom = 12.dp) // Increased spacing
             )
             
             Text(
