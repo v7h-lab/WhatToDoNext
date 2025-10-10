@@ -193,7 +193,7 @@ private fun ActivitySelectionStep(
             modifier = Modifier.padding(bottom = 24.dp)
         )
         
-        // Activity selection grid (single selection)
+        // Activity selection grid (single selection) - Fixed equal spacing
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f)
@@ -203,17 +203,33 @@ private fun ActivitySelectionStep(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    activityRow.forEach { activity ->
+                    // First activity always takes weight(1f)
+                    ActivitySelectionCard(
+                        activity = activityRow[0],
+                        isSelected = selectedActivity == activityRow[0],
+                        onToggle = {
+                            // Single selection: always set to the clicked activity
+                            onActivityChanged(activityRow[0])
+                            android.util.Log.d("OnboardingScreen", "Activity selected: ${activityRow[0].name}")
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Second activity or spacer for equal spacing
+                    if (activityRow.size == 2) {
                         ActivitySelectionCard(
-                            activity = activity,
-                            isSelected = selectedActivity == activity,
+                            activity = activityRow[1],
+                            isSelected = selectedActivity == activityRow[1],
                             onToggle = {
                                 // Single selection: always set to the clicked activity
-                                onActivityChanged(activity)
-                                android.util.Log.d("OnboardingScreen", "Activity selected: ${activity.name}")
+                                onActivityChanged(activityRow[1])
+                                android.util.Log.d("OnboardingScreen", "Activity selected: ${activityRow[1].name}")
                             },
                             modifier = Modifier.weight(1f)
                         )
+                    } else {
+                        // Add spacer to maintain equal spacing when odd number of items
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -290,13 +306,15 @@ private fun MoviePreferencesStep(
             }
             
             item {
-                // Genre chips in a flow layout
+                // Genre chips in horizontal scroll with 4 rows and consistent spacing
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    items(availableGenres.chunked(3)) { genreRow ->
+                    items(availableGenres.chunked(4)) { genreRow ->
                         Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 2.dp)
                         ) {
                             genreRow.forEach { genre ->
                                 FilterChip(
@@ -332,15 +350,17 @@ private fun MoviePreferencesStep(
             }
             
             item {
-                // Language chips in a flow layout
+                // Language chips in horizontal scroll with 4 rows and consistent spacing
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    items(availableLanguages.chunked(3)) { langRow ->
+                    items(availableLanguages.chunked(4)) { languageRow ->
                         Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 2.dp)
                         ) {
-                            langRow.forEach { (code, name) ->
+                            languageRow.forEach { (code, name) ->
                                 FilterChip(
                                     selected = selectedLanguages.contains(code),
                                     onClick = {
@@ -402,7 +422,10 @@ private fun ActivitySelectionCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.clickable { onToggle() },
+        modifier = modifier
+            .height(160.dp) // Fixed height for all cards
+            .fillMaxWidth() // Fixed width to fill available space
+            .clickable { onToggle() },
         shape = CardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
@@ -416,8 +439,11 @@ private fun ActivitySelectionCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = activity.icon,
@@ -434,13 +460,16 @@ private fun ActivitySelectionCard(
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurface
-                }
+                },
+                modifier = Modifier.padding(bottom = 4.dp)
             )
             
             Text(
                 text = activity.description,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
+                maxLines = 2, // Limit to 2 lines to maintain consistent height
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 } else {
